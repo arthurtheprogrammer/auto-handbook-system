@@ -492,14 +492,20 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     With newWB
         .Application.Calculation = xlCalculationAutomatic
         
-        ' Always refresh external links on open
+        ' CRITICAL: Prevent "recalculate before saving" prompt
+        .UpdateRemoteReferences = False  ' Don't auto-update external links
+        
+        ' Set link update preference to ALWAYS
         .UpdateLinks = xlUpdateLinksAlways
         
         ' Disable compatibility checker (faster save)
         .CheckCompatibility = False
         
-        ' Enable background refresh for external data
-        .EnableAutoRecover = False  ' Optional: speeds up save
+        ' Disable auto-recover for this workbook (optional speedup)
+        .EnableAutoRecover = False
+        
+        ' Prevent asking to update links on open
+        .AskToUpdateLinks = False
     End With
     
     ' Set each external link to refresh automatically
@@ -1168,14 +1174,15 @@ ErrorHandler:
     LogMessage "ERROR in PopulateSheetData: " & Err.description & " (Error " & Err.Number & ")"
     PopulateSheetData = False
 End Function
+
 '---------------------------------------------------------------
 ' ProcessSubjectBatch
 ' Purpose: Creates complete subject block with assessments, lecturers, and marker sections
 ' Row Structure:
 '   - Row 0 (header): Subject code, study period, dynamic enrolment formula
 '   - Row 1+: Assessment details (one row per assessment)
-'   - Last row: Total row with sum formulas
-'   - Extra rows: Added if lecturer count > assessment count
+'   - Last row: "Total" row with sum formulas
+'   - Extra rows added if lecturer count > assessment count
 ' Side effects: Updates currentRow to next available row
 '---------------------------------------------------------------
 Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, formulaQueue As Collection, validationQueue As Collection) As Boolean
@@ -1250,13 +1257,13 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
     Dim outputData() As Variant
     ReDim outputData(1 To assessmentRows, 1 To 12)
     
-    ' Header row (row 0)
+    ' Header row (row_0)
     Dim headerUID As String
-    headerUID = subjectCode & "|" & studyPeriod & "|0"
+    headerUID = subjectCode & "_" & studyPeriod & "_0"
     outputData(1, 1) = headerUID
     outputData(1, 2) = subjectCode
     outputData(1, 3) = studyPeriod
-    outputData(1, 12) = " "  ' Column L: whitespace to prevent lecturer spill
+    outputData(1, 12) = " "  ' Column L whitespace to prevent lecturer spill
     
     ' Assessment rows
     Dim i As Integer
@@ -1265,7 +1272,8 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
         assessment = assessments(i)
         
         Dim assessmentUID As String
-        assessmentUID = subjectCode & "|" & studyPeriod & "|" & i
+        assessmentUID = subjectCode & "_" & studyPeriod & "_" & i
+        
         outputData(i + 1, 1) = assessmentUID
         
         ' Use direct array access with error handling
@@ -1277,14 +1285,12 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
         
         Dim locationValue As Variant
         locationValue = assessment(2)  ' Location
-        
         If Err.Number <> 0 Then
             LogMessage "WARNING: Error accessing assessment array for " & subjectCode & " - " & Err.description
             Err.Clear
         End If
         On Error GoTo ErrorHandler
         
-        ' Only populate Location if it has a value
         If locationValue <> "" And Not IsEmpty(locationValue) Then
             outputData(i + 1, 9) = locationValue  ' Use Location value
         End If
@@ -1292,7 +1298,7 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
     
     ' Total row
     Dim totalUID As String
-    totalUID = subjectCode & "|" & studyPeriod & "|" & (uidCount + 1)
+    totalUID = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1)
     outputData(assessmentRows, 1) = totalUID
     outputData(assessmentRows, 5) = "Total"
     
@@ -1302,29 +1308,6 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
     ' Format header and total rows
     wsOutput.Rows(currentRow).Interior.Color = RGB(192, 192, 192)
     wsOutput.Cells(currentRow + assessmentRows - 1, 5).Font.Bold = True
-    
-    subjectEndRow = currentRow + assessmentRows - 1
-    
-    ' ========== ADD EXTRA ROWS FIRST (BEFORE QUEUING FORMULAS!) ==========
-    Dim extraRowsNeeded As Integer
-    extraRowsNeeded = totalRowsNeeded - assessmentRows
-    
-    If extraRowsNeeded > 0 Then
-        wsOutput.Rows(subjectEndRow + 1).Resize(extraRowsNeeded).Insert Shift:=xlDown
-        
-        ' Add UIDs to extra rows
-        Dim j As Integer
-        For j = 1 To extraRowsNeeded
-            Dim extraUID As String
-            extraUID = subjectCode & "|" & studyPeriod & "|" & (uidCount + 1 + j)
-            wsOutput.Cells(subjectEndRow + j, 1).Value = extraUID
-        Next j
-        
-        subjectEndRow = subjectEndRow + extraRowsNeeded
-        LogMessage "  Expanded " & subjectCode & " block by " & extraRowsNeeded & " rows for lecturers"
-    End If
-    
-    ' ========== NOW QUEUE ALL FORMULAS (ROWS ARE READY!) ==========
     
     ' Queue dynamic enrolment formula
     Dim enrolmentFileName As String
@@ -1339,17 +1322,10 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
         
         Dim enrolPath As String
         enrolPath = "'" & ENROLMENT_TRACKER_BASE & "[" & enrolmentFileName & "]Enrolment Number Tracker'!"
-        
         Dim enrolFormula As String
-        enrolFormula = "=IFERROR(INDEX(" & enrolPath & "$I:$I,SUMPRODUCT((" & enrolPath & "$A:$A=$B" & currentRow & ")*(" & enrolPath & "$C:$C=$C" & currentRow & ")*ROW(" & enrolPath & "$A:$A)),0))"
+        enrolFormula = "=IFERROR(INDEX(" & enrolPath & "$I:$I,SUMPRODUCT((" & enrolPath & "$A:$A=B" & currentRow & ")*(" & enrolPath & "$C:$C=C" & currentRow & ")*ROW(" & enrolPath & "$A:$A))),0)"
+        
         formulaQueue.add Array("D" & currentRow, enrolFormula)
-    End If
-    
-    ' Queue lecturer formulas (NOW rows are clear for spilling!)
-    If lecturerCount > 0 Then
-        Dim lecturerStartRow As Long
-        lecturerStartRow = currentRow + 1  ' First assessment row
-        Call QueueLecturerFormulas(lecturerStartRow, currentRow, subjectEndRow, subjectCode, studyPeriod, formulaQueue, wsOutput)
     End If
     
     ' Queue assessment formulas
@@ -1357,26 +1333,57 @@ Function ProcessSubjectBatch(wb As Workbook, wsOutput As Worksheet, ByRef subjec
     For i = 1 To assessments.Count
         formulaRow = currentRow + i
         
-        Dim assessmentItem As Variant
-        assessmentItem = assessments(i)
+        ' Assessment Quantity (Col I): Only queue formula if Location was empty
+        If outputData(i + 1, 9) = Empty Or outputData(i + 1, 9) = "" Then
+            Dim qtyFormula As String
+            qtyFormula = "=IF(H" & formulaRow & "<>"""", $D$" & currentRow & "/H" & formulaRow & ", $D$" & currentRow & ")"
+            formulaQueue.add Array("I" & formulaRow, qtyFormula)
+        End If
         
-        Call SetAssessmentQuantityFormula(wsOutput, formulaRow, GetAssessmentUID(assessmentItem), subjectCode, studyPeriod, wsAssessment)
-        Call SetMarkingHoursFormula(wsOutput, formulaRow)
+        ' Marking Hours (Col J): Always use formula
+        Dim markFormula As String
+        markFormula = "=IF(ISNUMBER(I" & formulaRow & "),IF(ISNUMBER(F" & formulaRow & "),I" & formulaRow & "*(F" & formulaRow & "/VALUE(LEFT($J$2,FIND("" "",$J$2)-1))),IF(ISNUMBER(G" & formulaRow & "),I" & formulaRow & "/(VALUE(LEFT($J$3,FIND("" "",$J$3)-1))),"""")),"""")"
+        formulaQueue.add Array("J" & formulaRow, markFormula)
     Next i
     
     ' Queue total formula
     If uidCount > 0 Then
-        Dim sumRange As String
-        sumRange = "J" & (currentRow + 1) & ":J" & (currentRow + uidCount)
-        wsOutput.Cells(currentRow + assessmentRows - 1, 10).Formula = "=SUM(" & sumRange & ")"
+        Dim totalRow As Long
+        totalRow = currentRow + assessmentRows - 1
+        formulaQueue.add Array("J" & totalRow, "=SUM(J" & (currentRow + 1) & ":J" & (currentRow + uidCount) & ")")
     End If
     
-    ' Queue marker block formulas
-    Call SetMarkerBlockFormulas(wsOutput, currentRow, subjectEndRow, 1, subjectCode, studyPeriod)
-    Call SetMarkerBlockFormulas(wsOutput, currentRow, subjectEndRow, 2, subjectCode, studyPeriod)
-    Call SetMarkerBlockFormulas(wsOutput, currentRow, subjectEndRow, 3, subjectCode, studyPeriod)
+    subjectEndRow = currentRow + assessmentRows - 1
     
-    ' Format marker Total rows as bold (columns T, AD, AN for marker 1, 2, 3)
+    ' Add extra rows if more lecturers than assessments
+    Dim extraRowsNeeded As Integer
+    extraRowsNeeded = totalRowsNeeded - assessmentRows
+    
+    If extraRowsNeeded > 0 Then
+        wsOutput.Rows(subjectEndRow + 1).Resize(extraRowsNeeded).Insert Shift:=xlDown
+        
+        ' Add UIDs to extra rows
+        Dim j As Integer
+        For j = 1 To extraRowsNeeded
+            Dim extraUID As String
+            extraUID = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1 + j)
+            wsOutput.Cells(subjectEndRow + j, 1).Value = extraUID
+        Next j
+        
+        subjectEndRow = subjectEndRow + extraRowsNeeded
+        
+        LogMessage "  Expanded " & subjectCode & " block by " & extraRowsNeeded & " rows for lecturers"
+    End If
+    
+    ' Queue lecturer formulas
+    Call QueueLecturerFormulas(currentRow + 1, currentRow, subjectEndRow, subjectCode, studyPeriod, formulaQueue, wsOutput)
+    
+    ' Queue marker block formulas
+    Call QueueMarkerFormulas(currentRow, subjectEndRow, 1, formulaQueue)
+    Call QueueMarkerFormulas(currentRow, subjectEndRow, 2, formulaQueue)
+    Call QueueMarkerFormulas(currentRow, subjectEndRow, 3, formulaQueue)
+    
+    ' Format marker "Total" rows as bold (columns T, AD, AN for marker 1, 2, 3)
     wsOutput.Cells(subjectEndRow, 20).Font.Bold = True  ' Column T (Marker 1)
     wsOutput.Cells(subjectEndRow, 30).Font.Bold = True  ' Column AD (Marker 2)
     wsOutput.Cells(subjectEndRow, 40).Font.Bold = True  ' Column AN (Marker 3)
@@ -1407,8 +1414,8 @@ Sub QueueLecturerFormulas(lecturerStartRow As Long, subjectStartRow As Long, sub
     
     ' Queue FILTER formula for first lecturer row (allows spilling to multiple rows)
    Dim lecFormula As String
-    lecFormula = "=IFERROR(FILTER(" & teachingPath & "$D:$D,(" & teachingPath & "$B:$B=$B" & subjectStartRow & ")*(" & teachingPath & "$C:$C=$C" & subjectStartRow & ")),""Add more rows"")"
-    formulaQueue.add Array("L" & lecturerStartRow, lecFormula)
+    lecFormula = "=IFERROR(INDEX(" & teachingPath & "$D:$D,SMALL(IF((" & teachingPath & "$B:$B=$B$" & subjectStartRow & ")*(" & teachingPath & "$C:$C=$C$" & subjectStartRow & "),ROW(" & teachingPath & "$D:$D))," & rowOffset & ")),"""")"
+    formulaQueue.add Array("L" & r, lecFormula)
     
     ' Bold the first lecturer cell (subject coordinator)
     wsOutput.Cells(lecturerStartRow, 12).Font.Bold = True
