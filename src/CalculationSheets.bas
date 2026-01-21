@@ -1,4 +1,3 @@
-Attribute VB_Name = "CalculationSheets"
 Option Explicit
 
 ' ===== CONFIGURATION =====
@@ -7,6 +6,7 @@ Public Const LOG_TO_STATUSBAR As Boolean = True
 
 ' ===== LOGGING SETUP =====
 Dim wsLog As Worksheet
+Private Const ENROLMENT_TRACKER_BASE As String = "https://unimelbcloud.sharepoint.com/teams/DepartmentofManagementMarketing-DepartmentOperations/Shared Documents/TEACHING MATRIX & ENROLMENT TRACKER/"
 
 Sub InitializeProcessLog(wb As Workbook)
     Dim tempLog As Worksheet
@@ -166,122 +166,10 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
 End Function
 
 ' ===== HELPER FUNCTIONS =====
-Function GetSubjectUID(subjectArray As Variant) As String
+Function SafeArrayIndex(arr As Variant, idx As Integer, defaultVal As Variant) As Variant
     On Error Resume Next
-    GetSubjectUID = subjectArray(0)
-    If Err.Number <> 0 Then GetSubjectUID = ""
-    On Error GoTo 0
-End Function
-
-Function GetSubjectCode(subjectArray As Variant) As String
-    On Error Resume Next
-    GetSubjectCode = subjectArray(1)
-    If Err.Number <> 0 Then GetSubjectCode = ""
-    On Error GoTo 0
-End Function
-
-Function GetSubjectName(subjectArray As Variant) As String
-    On Error Resume Next
-    GetSubjectName = subjectArray(2)
-    If Err.Number <> 0 Then GetSubjectName = ""
-    On Error GoTo 0
-End Function
-
-Function GetSubjectStudyPeriod(subjectArray As Variant) As String
-    On Error Resume Next
-    GetSubjectStudyPeriod = subjectArray(3)
-    If Err.Number <> 0 Then GetSubjectStudyPeriod = ""
-    On Error GoTo 0
-End Function
-
-Function GetSubjectGroupedPeriod(subjectArray As Variant) As String
-    On Error Resume Next
-    GetSubjectGroupedPeriod = subjectArray(4)
-    If Err.Number <> 0 Then GetSubjectGroupedPeriod = ""
-    On Error GoTo 0
-End Function
-
-Function GetSubjectOriginalOrder(subjectArray As Variant) As Long
-    On Error Resume Next
-    GetSubjectOriginalOrder = subjectArray(5)
-    If Err.Number <> 0 Then GetSubjectOriginalOrder = 0
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentUID(assessmentArray As Variant) As String
-    On Error Resume Next
-    GetAssessmentUID = assessmentArray(0)
-    If Err.Number <> 0 Then GetAssessmentUID = ""
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentDescription(assessmentArray As Variant) As String
-    On Error Resume Next
-    GetAssessmentDescription = assessmentArray(1)
-    If Err.Number <> 0 Then GetAssessmentDescription = ""
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentLocation(assessmentArray As Variant) As Variant
-    On Error Resume Next
-    GetAssessmentLocation = assessmentArray(2)
-    If Err.Number <> 0 Then GetAssessmentLocation = Empty
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentWordCount(assessmentArray As Variant) As Variant
-    On Error Resume Next
-    GetAssessmentWordCount = assessmentArray(3)
-    If Err.Number <> 0 Then GetAssessmentWordCount = Empty
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentExam(assessmentArray As Variant) As Variant
-    On Error Resume Next
-    GetAssessmentExam = assessmentArray(4)
-    If Err.Number <> 0 Then GetAssessmentExam = Empty
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentGroupSize(assessmentArray As Variant) As Variant
-    On Error Resume Next
-    GetAssessmentGroupSize = assessmentArray(5)
-    If Err.Number <> 0 Then GetAssessmentGroupSize = Empty
-    On Error GoTo 0
-End Function
-
-Function GetAssessmentActualStudyPeriod(assessmentArray As Variant) As String
-    On Error Resume Next
-    GetAssessmentActualStudyPeriod = assessmentArray(6)
-    If Err.Number <> 0 Then GetAssessmentActualStudyPeriod = ""
-    On Error GoTo 0
-End Function
-
-Function GetLecturerName(lecturerArray As Variant) As String
-    On Error Resume Next
-    GetLecturerName = lecturerArray(0)
-    If Err.Number <> 0 Then GetLecturerName = ""
-    On Error GoTo 0
-End Function
-
-Function GetLecturerStatus(lecturerArray As Variant) As String
-    On Error Resume Next
-    GetLecturerStatus = lecturerArray(1)
-    If Err.Number <> 0 Then GetLecturerStatus = ""
-    On Error GoTo 0
-End Function
-
-Function GetLecturerActivityID(lecturerArray As Variant) As String
-    On Error Resume Next
-    GetLecturerActivityID = lecturerArray(2)
-    If Err.Number <> 0 Then GetLecturerActivityID = ""
-    On Error GoTo 0
-End Function
-
-Function GetLecturerStreams(lecturerArray As Variant) As Variant
-    On Error Resume Next
-    GetLecturerStreams = lecturerArray(3)
-    If Err.Number <> 0 Then GetLecturerStreams = Empty
+    SafeArrayIndex = arr(idx)
+    If Err.Number <> 0 Then SafeArrayIndex = defaultVal
     On Error GoTo 0
 End Function
 
@@ -506,7 +394,7 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     LogMessage "Target save path: " & savePath
     
     On Error Resume Next
-    newWB.SaveAs Filename:=savePath, FileFormat:=xlOpenXMLWorkbook
+    newWB.SaveAs FileName:=savePath, FileFormat:=xlOpenXMLWorkbook
     
     If Err.Number <> 0 Then
         Dim saveErr As Long
@@ -519,7 +407,7 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
         tempPath = GetUniqueFilename(tempBasePath, newFileName, ".xlsx")
         
         Err.Clear
-        newWB.SaveAs Filename:=tempPath, FileFormat:=xlOpenXMLWorkbook
+        newWB.SaveAs FileName:=tempPath, FileFormat:=xlOpenXMLWorkbook
         
         If Err.Number = 0 Then
             MsgBox "Could not save to SharePoint location." & vbCrLf & vbCrLf & _
@@ -690,7 +578,7 @@ Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Dou
     
     Call CreateHeaders(wsOutput)
     
-    wsOutput.Range("D2").Value = "(manual)"
+    wsOutput.Range("D2").Value = "(automatic)"
     wsOutput.Range("J2").Value = wordBench & " words/hr"
     wsOutput.Range("J3").Value = examBench & " exams/hr"
     wsOutput.Range("P2").Value = markingSupportBench & " hrs/stream"
@@ -703,7 +591,7 @@ Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Dou
     wsOutput.Range("AR3").Value = examBench & " exams/hr"
     
     wsOutput.Columns("A:A").Hidden = True
-    wsOutput.Range("D4").Select
+    wsOutput.Range("E4").Select
     ActiveWindow.FreezePanes = True
     
     Dim subjectData As Collection
@@ -890,12 +778,7 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     Dim tStart As Double
     tStart = Timer
     
-    If subjectData Is Nothing Then
-        LogMessage "ERROR: subjectData is Nothing in PopulateSheetData"
-        Exit Function
-    End If
-    
-    If subjectData.Count = 0 Then
+    If subjectData Is Nothing Or subjectData.Count = 0 Then
         LogMessage "WARNING: No subjects to populate"
         PopulateSheetData = True
         Exit Function
@@ -905,21 +788,17 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     Set wsAssessment = wb.Sheets("assessment data parsed")
     
     If wsAssessment Is Nothing Then
-        LogMessage "ERROR: Assessment sheet not found in PopulateSheetData"
+        LogMessage "ERROR: Assessment sheet not found"
         Exit Function
     End If
     
     Dim groupedPeriod As String
-    groupedPeriod = GetSubjectGroupedPeriod(subjectData(1))
-    
-    If groupedPeriod = "" Then
-        LogMessage "ERROR: Could not determine grouped period"
-        Exit Function
-    End If
+    groupedPeriod = SafeArrayIndex(subjectData(1), 4, "")
     
     Dim currentRow As Long
     currentRow = 4
     
+    ' Add category headers
     If groupedPeriod = "FHY" Then
         wsOutput.Rows(currentRow).Interior.Color = RGB(0, 0, 0)
         wsOutput.Cells(currentRow, 2).Value = "SUMMER"
@@ -934,6 +813,7 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
         currentRow = currentRow + 1
     End If
     
+    ' Categorize subjects
     Dim summerSubjects As New Collection
     Dim semester1Subjects As New Collection
     Dim winterSubjects As New Collection
@@ -942,28 +822,28 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     Dim subject As Variant
     For Each subject In subjectData
         Dim studyPeriod As String
-        studyPeriod = GetSubjectStudyPeriod(subject)
+        studyPeriod = SafeArrayIndex(subject, 3, "")
         
         Dim category As String
         category = CategorizeStudyPeriod(studyPeriod, groupedPeriod)
         
         Select Case category
-            Case "SUMMER"
-                summerSubjects.add subject
-            Case "SEMESTER 1"
-                semester1Subjects.add subject
-            Case "WINTER"
-                winterSubjects.add subject
-            Case "SEMESTER 2"
-                semester2Subjects.add subject
+            Case "SUMMER": summerSubjects.add subject
+            Case "SEMESTER 1": semester1Subjects.add subject
+            Case "WINTER": winterSubjects.add subject
+            Case "SEMESTER 2": semester2Subjects.add subject
         End Select
     Next subject
     
+    ' Collection to store marker formula info for batch processing
+    Dim markerFormulaQueue As New Collection
+    
+    ' Process subjects by category
     If groupedPeriod = "FHY" Then
         If summerSubjects.Count > 0 Then
             For Each subject In summerSubjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench) Then
-                    LogMessage "ERROR: Failed to process subject in SUMMER category"
+                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+                    LogMessage "ERROR: Failed to process subject in SUMMER"
                 End If
             Next subject
         End If
@@ -976,16 +856,16 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
             currentRow = currentRow + 1
             
             For Each subject In semester1Subjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench) Then
-                    LogMessage "ERROR: Failed to process subject in SEMESTER 1 category"
+                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+                    LogMessage "ERROR: Failed to process subject in SEMESTER 1"
                 End If
             Next subject
         End If
     Else
         If winterSubjects.Count > 0 Then
             For Each subject In winterSubjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench) Then
-                    LogMessage "ERROR: Failed to process subject in WINTER category"
+                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+                    LogMessage "ERROR: Failed to process subject in WINTER"
                 End If
             Next subject
         End If
@@ -998,12 +878,19 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
             currentRow = currentRow + 1
             
             For Each subject In semester2Subjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench) Then
-                    LogMessage "ERROR: Failed to process subject in SEMESTER 2 category"
+                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+                    LogMessage "ERROR: Failed to process subject in SEMESTER 2"
                 End If
             Next subject
         End If
     End If
+    
+    ' NOW APPLY ALL MARKER FORMULAS IN BATCH
+    LogMessage "Applying marker formulas in batch..."
+    Dim formulaInfo As Variant
+    For Each formulaInfo In markerFormulaQueue
+        Call SetMarkerBlockFormulas(wsOutput, CLng(formulaInfo(0)), CLng(formulaInfo(1)), CInt(formulaInfo(2)), CStr(formulaInfo(3)), CStr(formulaInfo(4)))
+    Next formulaInfo
     
     LogMessage "PopulateSheetData completed", Timer - tStart
     PopulateSheetData = True
@@ -1014,7 +901,7 @@ ErrorHandler:
     PopulateSheetData = False
 End Function
 
-Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double) As Boolean
+Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, ByRef markerFormulaQueue As Collection) As Boolean
     On Error GoTo ErrorHandler
     
     ProcessSubject = False
@@ -1024,104 +911,108 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     
     Dim subjectCode As String
     Dim studyPeriod As String
-    subjectCode = GetSubjectCode(subject)
-    studyPeriod = GetSubjectStudyPeriod(subject)
+    subjectCode = SafeArrayIndex(subject, 1, "")
+    studyPeriod = SafeArrayIndex(subject, 3, "")
     
     If subjectCode = "" Or studyPeriod = "" Then
-        LogMessage "ERROR: Invalid subject data in ProcessSubject"
+        LogMessage "ERROR: Invalid subject data"
         Exit Function
     End If
     
     Dim subjectStartRow As Long
-    Dim subjectEndRow As Long
     subjectStartRow = currentRow
     
+    ' Get assessments and lecturers
     Dim assessments As Collection
     Set assessments = GetAssessmentsForSubject(wsAssessment, subjectCode, studyPeriod)
     
-    If assessments Is Nothing Then
-        LogMessage "ERROR: Failed to get assessments for " & subjectCode
-        Exit Function
-    End If
-    
-    If assessments.Count = 0 Then
+    If assessments Is Nothing Or assessments.Count = 0 Then
         ProcessSubject = True
         Exit Function
     End If
     
     Dim lecturers As Collection
     Set lecturers = GetLecturersForSubjectFlexible(wb, subjectCode, studyPeriod)
+    If lecturers Is Nothing Then Set lecturers = New Collection
     
-    If lecturers Is Nothing Then
-        LogMessage "WARNING: Failed to get lecturers for " & subjectCode
-        Set lecturers = New Collection
-    End If
-    
+    ' Calculate structure
     Dim uidCount As Integer
     uidCount = assessments.Count
     
     Dim assessmentRows As Integer
     assessmentRows = uidCount + 2
     
-    Dim lecturerCount As Integer
-    lecturerCount = lecturers.Count
-    
     Dim totalRowsNeeded As Integer
-    totalRowsNeeded = Application.WorksheetFunction.Max(assessmentRows, lecturerCount + 1)
+    totalRowsNeeded = Application.WorksheetFunction.Max(assessmentRows, lecturers.Count + 1)
     
+    ' Build output array
     Dim outputData() As Variant
     ReDim outputData(1 To assessmentRows, 1 To 10)
     
-    Dim headerUID As String
-    headerUID = subjectCode & "_" & studyPeriod & "_0"
-    outputData(1, 1) = headerUID
+    ' Header row
+    outputData(1, 1) = subjectCode & "_" & studyPeriod & "_0"
     outputData(1, 2) = subjectCode
     outputData(1, 3) = studyPeriod
     outputData(1, 4) = 0
     
+    ' Assessment rows
     Dim i As Integer
     For i = 1 To assessments.Count
         Dim assessment As Variant
         assessment = assessments(i)
         
-        Dim assessmentUID As String
-        assessmentUID = subjectCode & "_" & studyPeriod & "_" & i
-        
-        outputData(i + 1, 1) = assessmentUID
-        outputData(i + 1, 5) = GetAssessmentDescription(assessment)
-        outputData(i + 1, 6) = GetAssessmentWordCount(assessment)
-        outputData(i + 1, 7) = GetAssessmentExam(assessment)
-        outputData(i + 1, 8) = GetAssessmentGroupSize(assessment)
+        outputData(i + 1, 1) = subjectCode & "_" & studyPeriod & "_" & i
+        outputData(i + 1, 5) = SafeArrayIndex(assessment, 1, "")
+        outputData(i + 1, 6) = SafeArrayIndex(assessment, 3, 0)
+        outputData(i + 1, 7) = SafeArrayIndex(assessment, 4, 0)
+        outputData(i + 1, 8) = SafeArrayIndex(assessment, 5, 0)
     Next i
     
-    Dim totalUID As String
-    totalUID = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1)
-    outputData(assessmentRows, 1) = totalUID
+    ' Total row
+    outputData(assessmentRows, 1) = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1)
     outputData(assessmentRows, 5) = "Total"
     
+    ' WRITE DATA
     wsOutput.Cells(currentRow, 1).Resize(assessmentRows, 10).Value = outputData
     
+    ' Add enrolment formula
+    Dim enrolFile As String
+    enrolFile = wb.Sheets("Dashboard").Range("C3").Value
+    If enrolFile <> "" Then
+        enrolFile = Trim(enrolFile)
+        If Right(LCase(enrolFile), 5) <> ".xlsm" Then enrolFile = enrolFile & ".xlsm"
+        
+        Dim enrolPath As String
+        enrolPath = "'" & ENROLMENT_TRACKER_BASE & "[" & enrolFile & "]Enrolment Number Tracker'!"
+        
+        wsOutput.Cells(currentRow, 4).Formula = "=IFERROR(INDEX(" & enrolPath & "$I:$I,SUMPRODUCT((" & enrolPath & "$A:$A=B" & currentRow & ")*(" & enrolPath & "$C:$C=C" & currentRow & ")*ROW(" & enrolPath & "$A:$A))),0)"
+    End If
+    
+    ' Format header row
     wsOutput.Rows(currentRow).Interior.Color = RGB(192, 192, 192)
     wsOutput.Cells(currentRow + assessmentRows - 1, 5).Font.Bold = True
     
+    ' Add assessment formulas
     Dim formulaRow As Long
     For i = 1 To assessments.Count
         formulaRow = currentRow + i
-        
         Dim assessmentItem As Variant
         assessmentItem = assessments(i)
-        Call SetAssessmentQuantityFormula(wsOutput, formulaRow, GetAssessmentUID(assessmentItem), subjectCode, studyPeriod, wsAssessment)
+        Call SetAssessmentQuantityFormula(wsOutput, formulaRow, SafeArrayIndex(assessmentItem, 0, ""), subjectCode, studyPeriod, wsAssessment)
         Call SetMarkingHoursFormula(wsOutput, formulaRow)
     Next i
     
+    ' Add total formula
     If uidCount > 0 Then
-        Dim sumRange As String
-        sumRange = "J" & (currentRow + 1) & ":J" & (currentRow + uidCount)
-        wsOutput.Cells(currentRow + assessmentRows - 1, 10).Formula = "=SUM(" & sumRange & ")"
+        wsOutput.Cells(currentRow + assessmentRows - 1, 10).Formula = "=SUM(J" & (currentRow + 1) & ":J" & (currentRow + uidCount) & ")"
     End If
     
+    Dim subjectEndRow As Long
+    Dim totalRowIndex As Long
     subjectEndRow = currentRow + assessmentRows - 1
+    totalRowIndex = subjectEndRow
     
+    ' Expand if needed
     Dim extraRowsNeeded As Integer
     extraRowsNeeded = totalRowsNeeded - assessmentRows
     
@@ -1130,27 +1021,43 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
         
         Dim j As Integer
         For j = 1 To extraRowsNeeded
-            Dim extraUID As String
-            extraUID = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1 + j)
-            wsOutput.Cells(subjectEndRow + j, 1).Value = extraUID
+            wsOutput.Cells(subjectEndRow + j, 1).Value = subjectCode & "_" & studyPeriod & "_" & (uidCount + 1 + j)
         Next j
         
         subjectEndRow = subjectEndRow + extraRowsNeeded
-        
-        LogMessage "  Expanded " & subjectCode & " block by " & extraRowsNeeded & " rows for lecturers"
     End If
     
-    If lecturerCount > 0 Then
-        Dim lecturerStartRow As Long
-        lecturerStartRow = subjectStartRow + 1
-        Call PopulateLecturerData(wsOutput, lecturers, lecturerStartRow, markingSupportBench)
+    ' Populate lecturer data
+    If lecturers.Count > 0 Then
+        Call PopulateLecturerData(wsOutput, lecturers, subjectStartRow + 1, totalRowIndex, markingSupportBench)
     End If
     
-    Call SetMarkerBlockFormulas(wsOutput, subjectStartRow, subjectEndRow, 1, subjectCode, studyPeriod)
-    Call SetMarkerBlockFormulas(wsOutput, subjectStartRow, subjectEndRow, 2, subjectCode, studyPeriod)
-    Call SetMarkerBlockFormulas(wsOutput, subjectStartRow, subjectEndRow, 3, subjectCode, studyPeriod)
+    ' QUEUE marker formulas for batch processing (don't execute yet)
+    Dim markerInfo(0 To 4) As Variant
+    markerInfo(0) = subjectStartRow
+    markerInfo(1) = subjectEndRow
+    markerInfo(2) = 1  ' Marker number
+    markerInfo(3) = subjectCode
+    markerInfo(4) = studyPeriod
+    markerFormulaQueue.add markerInfo
     
-    ' Add checkboxes for each marker block
+    Dim markerInfo2(0 To 4) As Variant
+    markerInfo2(0) = subjectStartRow
+    markerInfo2(1) = subjectEndRow
+    markerInfo2(2) = 2
+    markerInfo2(3) = subjectCode
+    markerInfo2(4) = studyPeriod
+    markerFormulaQueue.add markerInfo2
+    
+    Dim markerInfo3(0 To 4) As Variant
+    markerInfo3(0) = subjectStartRow
+    markerInfo3(1) = subjectEndRow
+    markerInfo3(2) = 3
+    markerInfo3(3) = subjectCode
+    markerInfo3(4) = studyPeriod
+    markerFormulaQueue.add markerInfo3
+    
+    ' Add checkboxes
     Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 1)
     Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 2)
     Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 3)
@@ -1161,9 +1068,18 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     Exit Function
     
 ErrorHandler:
-    LogMessage "ERROR in ProcessSubject (" & subjectCode & "): " & Err.description & " (Error " & Err.Number & ")"
+    LogMessage "ERROR in ProcessSubject (" & subjectCode & "): " & Err.description
     ProcessSubject = False
 End Function
+
+
+' Helper function to build assessment quantity formula
+Function BuildAssessmentQuantityFormula(rowNum As Long, assessUID As String, subjectCode As String, studyPeriod As String) As String
+    ' This builds the VLOOKUP formula for assessment quantity
+    BuildAssessmentQuantityFormula = "=IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""" & studyPeriod & """)),9,FALSE),IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""All"")),9,FALSE),""""))"
+End Function
+
+
 
 Sub AddMarkerCheckboxes(wsOutput As Worksheet, subjectStartRow As Long, markerNum As Integer)
     On Error GoTo ErrorHandler
@@ -1223,22 +1139,21 @@ End Sub
 Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subjectEndRow As Long, markerNum As Integer, subjectCode As String, studyPeriod As String)
     On Error GoTo ErrorHandler
     
-    Dim baseCol As Integer
-    Dim detailsCol As Integer, wordCol As Integer, examCol As Integer, groupCol As Integer
-    Dim qtyCol As Integer, allocCol As Integer
-    Dim benchmarkCol As Integer
-    
+    Dim baseCol As Integer, benchmarkCol As Integer
     Select Case markerNum
         Case 1
-            baseCol = 19
-            benchmarkCol = 25
+            baseCol = 19  ' Column S
+            benchmarkCol = 25  ' Column Y
         Case 2
-            baseCol = 29
-            benchmarkCol = 35
+            baseCol = 29  ' Column AC
+            benchmarkCol = 35  ' Column AI
         Case 3
-            baseCol = 39
-            benchmarkCol = 44
+            baseCol = 39  ' Column AM
+            benchmarkCol = 44  ' Column AR
     End Select
+    
+    Dim detailsCol As Integer, wordCol As Integer, examCol As Integer
+    Dim groupCol As Integer, qtyCol As Integer, allocCol As Integer
     
     detailsCol = baseCol + 1
     wordCol = baseCol + 2
@@ -1247,102 +1162,70 @@ Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subje
     qtyCol = baseCol + 5
     allocCol = baseCol + 6
     
-    ' Build all formulas in array first (PERFORMANCE FIX)
+    ' Calculate number of rows EXCLUDING the header row
     Dim numRows As Long
-    numRows = subjectEndRow - subjectStartRow + 1
+    numRows = subjectEndRow - subjectStartRow  ' Changed from +1
     
-    Dim formulaArray() As Variant
-    ReDim formulaArray(1 To numRows, 1 To 6)
+    ' BUILD FORMULA ARRAYS in memory
+    Dim wordFormulas As Variant
+    Dim examFormulas As Variant
+    Dim groupFormulas As Variant
+    Dim qtyFormulas As Variant
+    Dim allocFormulas As Variant
+    
+    ReDim wordFormulas(1 To numRows, 1 To 1)
+    ReDim examFormulas(1 To numRows, 1 To 1)
+    ReDim groupFormulas(1 To numRows, 1 To 1)
+    ReDim qtyFormulas(1 To numRows, 1 To 1)
+    ReDim allocFormulas(1 To numRows, 1 To 1)
     
     Dim r As Long, arrayRow As Long
-    For r = subjectStartRow To subjectEndRow
-        arrayRow = r - subjectStartRow + 1
+    Dim detailColLetter As String, wordColLetter As String, examColLetter As String
+    Dim qtyColLetter As String, benchmarkColLetter As String
+    
+    detailColLetter = ColLetter(detailsCol)
+    wordColLetter = ColLetter(wordCol)
+    examColLetter = ColLetter(examCol)
+    qtyColLetter = ColLetter(qtyCol)
+    benchmarkColLetter = ColLetter(benchmarkCol)
+    
+    ' Start from subjectStartRow + 1 (skip header row)
+    For r = subjectStartRow + 1 To subjectEndRow
+        arrayRow = r - subjectStartRow  ' Adjusted offset
         
         If wsOutput.Cells(r, 5).Value = "Total" Then
-            ' Total row
-            formulaArray(arrayRow, 1) = "Total"  ' Details column
-            
-            Dim sumStart As Long
-            sumStart = subjectStartRow + 1
-            Dim sumEnd As Long
-            sumEnd = r - 1
-            
-            If sumEnd >= sumStart Then
-                formulaArray(arrayRow, 6) = "=SUM(" & ColLetter(allocCol) & sumStart & ":" & ColLetter(allocCol) & sumEnd & ")"
-            End If
-        Else
-            ' Regular assessment row - use INDEX-MATCH
-            Dim wordFormula As String
-            wordFormula = "=IFERROR(IF(INDEX($F$" & (subjectStartRow + 1) & ":$F$" & (subjectEndRow - 1) & "," & _
-                         "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""",""""," & _
-                         "INDEX($F$" & (subjectStartRow + 1) & ":$F$" & (subjectEndRow - 1) & "," & _
-                         "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
-            formulaArray(arrayRow, 2) = wordFormula
-            
-            Dim examFormula As String
-            examFormula = "=IFERROR(IF(INDEX($G$" & (subjectStartRow + 1) & ":$G$" & (subjectEndRow - 1) & "," & _
-                         "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""",""""," & _
-                         "INDEX($G$" & (subjectStartRow + 1) & ":$G$" & (subjectEndRow - 1) & "," & _
-                         "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
-            formulaArray(arrayRow, 3) = examFormula
-            
-            Dim groupFormula As String
-            groupFormula = "=IFERROR(IF(INDEX($H$" & (subjectStartRow + 1) & ":$H$" & (subjectEndRow - 1) & "," & _
-                          "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""",""""," & _
-                          "INDEX($H$" & (subjectStartRow + 1) & ":$H$" & (subjectEndRow - 1) & "," & _
-                          "MATCH(" & ColLetter(detailsCol) & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
-            formulaArray(arrayRow, 4) = groupFormula
-            
-            Dim qtyFormula As String
-            qtyFormula = "=IF(" & ColLetter(detailsCol) & r & "="""","""",0)"
-            formulaArray(arrayRow, 5) = qtyFormula
-            
-            Dim allocFormula As String
-            allocFormula = "=IF(" & ColLetter(qtyCol) & r & "="""","""", " & _
-                          "IF(ISNUMBER(" & ColLetter(qtyCol) & r & "), " & _
-                          "IF(ISNUMBER(" & ColLetter(wordCol) & r & "), " & _
-                          ColLetter(qtyCol) & r & "*(" & ColLetter(wordCol) & r & "/VALUE(LEFT($" & ColLetter(benchmarkCol) & "$2,FIND("" "",$" & ColLetter(benchmarkCol) & "$2)-1))), " & _
-                          "IF(ISNUMBER(" & ColLetter(examCol) & r & "), " & _
-                          ColLetter(qtyCol) & r & "/(VALUE(LEFT($" & ColLetter(benchmarkCol) & "$3,FIND("" "",$" & ColLetter(benchmarkCol) & "$3)-1))), """")), " & _
-                          ColLetter(qtyCol) & r & "))"
-            formulaArray(arrayRow, 6) = allocFormula
-        End If
-    Next r
-    
-    ' Write all formulas at once (PERFORMANCE FIX)
-    Dim targetRange As Range
-    Set targetRange = wsOutput.Range(wsOutput.Cells(subjectStartRow, wordCol), wsOutput.Cells(subjectEndRow, allocCol))
-    targetRange.Value = formulaArray
-    
-    ' Now set as formulas (Excel will evaluate them)
-    For r = subjectStartRow To subjectEndRow
-        arrayRow = r - subjectStartRow + 1
-        
-        If formulaArray(arrayRow, 2) <> "" And Left(formulaArray(arrayRow, 2), 1) = "=" Then
-            wsOutput.Cells(r, wordCol).Formula = formulaArray(arrayRow, 2)
-        End If
-        If formulaArray(arrayRow, 3) <> "" And Left(formulaArray(arrayRow, 3), 1) = "=" Then
-            wsOutput.Cells(r, examCol).Formula = formulaArray(arrayRow, 3)
-        End If
-        If formulaArray(arrayRow, 4) <> "" And Left(formulaArray(arrayRow, 4), 1) = "=" Then
-            wsOutput.Cells(r, groupCol).Formula = formulaArray(arrayRow, 4)
-        End If
-        If formulaArray(arrayRow, 5) <> "" And Left(formulaArray(arrayRow, 5), 1) = "=" Then
-            wsOutput.Cells(r, qtyCol).Formula = formulaArray(arrayRow, 5)
-        End If
-        If formulaArray(arrayRow, 6) <> "" And Left(formulaArray(arrayRow, 6), 1) = "=" Then
-            wsOutput.Cells(r, allocCol).Formula = formulaArray(arrayRow, 6)
-        ElseIf formulaArray(arrayRow, 1) = "Total" Then
+            ' Total row - write "Total" text and SUM formula
             wsOutput.Cells(r, detailsCol).Value = "Total"
             wsOutput.Cells(r, detailsCol).Font.Bold = True
+            allocFormulas(arrayRow, 1) = "=SUM(" & ColLetter(allocCol) & (subjectStartRow + 1) & ":" & ColLetter(allocCol) & (r - 1) & ")"
+        Else
+            ' Regular assessment rows - all formulas
+            wordFormulas(arrayRow, 1) = "=IFERROR(IF(INDEX($F$" & (subjectStartRow + 1) & ":$F$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""","""", INDEX($F$" & (subjectStartRow + 1) & ":$F$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
+            
+            examFormulas(arrayRow, 1) = "=IFERROR(IF(INDEX($G$" & (subjectStartRow + 1) & ":$G$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""","""", INDEX($G$" & (subjectStartRow + 1) & ":$G$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
+            
+            groupFormulas(arrayRow, 1) = "=IFERROR(IF(INDEX($H$" & (subjectStartRow + 1) & ":$H$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))="""","""", INDEX($H$" & (subjectStartRow + 1) & ":$H$" & (subjectEndRow - 1) & ", MATCH(" & detailColLetter & r & ",$E$" & (subjectStartRow + 1) & ":$E$" & (subjectEndRow - 1) & ",0))),"""")"
+            
+            qtyFormulas(arrayRow, 1) = "=IF(" & detailColLetter & r & "="""","""",0)"
+            
+            allocFormulas(arrayRow, 1) = "=IF(" & qtyColLetter & r & "="""","""", IF(ISNUMBER(" & qtyColLetter & r & "), IF(ISNUMBER(" & wordColLetter & r & "), " & qtyColLetter & r & "*" & wordColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$2,FIND("" "",$" & benchmarkColLetter & "$2)-1)), IF(ISNUMBER(" & examColLetter & r & "), " & qtyColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$3,FIND("" "",$" & benchmarkColLetter & "$3)-1)),"""")), " & qtyColLetter & r & "))"
         End If
     Next r
+    
+    ' BATCH WRITE - starting from subjectStartRow + 1 (skip header)
+    wsOutput.Range(wsOutput.Cells(subjectStartRow + 1, wordCol), wsOutput.Cells(subjectEndRow, wordCol)).Formula = wordFormulas
+    wsOutput.Range(wsOutput.Cells(subjectStartRow + 1, examCol), wsOutput.Cells(subjectEndRow, examCol)).Formula = examFormulas
+    wsOutput.Range(wsOutput.Cells(subjectStartRow + 1, groupCol), wsOutput.Cells(subjectEndRow, groupCol)).Formula = groupFormulas
+    wsOutput.Range(wsOutput.Cells(subjectStartRow + 1, qtyCol), wsOutput.Cells(subjectEndRow, qtyCol)).Formula = qtyFormulas
+    wsOutput.Range(wsOutput.Cells(subjectStartRow + 1, allocCol), wsOutput.Cells(subjectEndRow, allocCol)).Formula = allocFormulas
     
     Exit Sub
     
 ErrorHandler:
     LogMessage "ERROR in SetMarkerBlockFormulas: " & Err.description
 End Sub
+
+
 
 Function ColLetter(colNum As Integer) As String
     ColLetter = Split(Cells(1, colNum).Address, "$")(1)
@@ -1540,12 +1423,13 @@ ErrorHandler:
     Set GetLecturersForSubjectFlexible = Nothing
 End Function
 
-Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRow As Long, markingSupportBench As Double)
+Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRow As Long, totalRow As Long, markingSupportBench As Double)
     On Error GoTo ErrorHandler
     
     If lecturers Is Nothing Or lecturers.Count = 0 Then Exit Sub
     
-    Dim lecturerData() As Variant
+    ' Build lecturer data array (Columns L-O: Name, Status, Streams, Activity ID)
+    Dim lecturerData As Variant
     ReDim lecturerData(1 To lecturers.Count, 1 To 4)
     
     Dim i As Integer
@@ -1553,25 +1437,37 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
     
     For i = 1 To lecturers.Count
         lecItem = lecturers(i)
-        
-        lecturerData(i, 1) = GetLecturerName(lecItem)
-        lecturerData(i, 2) = GetLecturerStatus(lecItem)
-        lecturerData(i, 3) = GetLecturerStreams(lecItem)
-        lecturerData(i, 4) = GetLecturerActivityID(lecItem)
+        lecturerData(i, 1) = SafeArrayIndex(lecItem, 0, "")  ' Name
+        lecturerData(i, 2) = SafeArrayIndex(lecItem, 1, "")  ' Status
+        lecturerData(i, 3) = SafeArrayIndex(lecItem, 3, "")  ' Streams
+        lecturerData(i, 4) = SafeArrayIndex(lecItem, 2, "")  ' Activity ID
     Next i
     
+    ' Write lecturer data (Columns L-O: 12-15)
     wsOutput.Cells(startRow, 12).Resize(lecturers.Count, 4).Value = lecturerData
+    
+    ' Bold first lecturer (subject coordinator)
+    If lecturers.Count > 0 Then
+        wsOutput.Cells(startRow, 12).Font.Bold = True
+    End If
+    
+    ' BUILD FORMULA ARRAYS for columns P and Q
+    Dim formulas() As Variant
+    ReDim formulas(1 To lecturers.Count, 1 To 2)
     
     Dim currentRow As Long
     For i = 1 To lecturers.Count
         currentRow = startRow + i - 1
         
-        wsOutput.Cells(currentRow, 16).Formula = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($P$2,FIND("" "",$P$2)-1)),"""")"
+        ' Column P (16): Allocated Marking
+        formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($P$2,FIND("" "",$P$2)-1)),"""")"
         
-        Dim totalFormula As String
-        totalFormula = "=IFERROR(INDEX($J:$J,MATCH(""Total"",$E:$E,0))-P" & currentRow & ","""")"
-        wsOutput.Cells(currentRow, 17).Formula = totalFormula
+        ' Column Q (17): Marking Support Hours Available
+        formulas(i, 2) = "=IF(P" & currentRow & "="""","""",$J$" & totalRow & "-P" & currentRow & ")"
     Next i
+    
+    ' BATCH WRITE both formulas at once
+    wsOutput.Cells(startRow, 16).Resize(lecturers.Count, 2).Formula = formulas
     
     Exit Sub
     
@@ -1932,98 +1828,3 @@ Sub CleanupPartialSheets(wb As Workbook)
     
     On Error GoTo 0
 End Sub
-
-Function ValidateSheetStructure(ws As Worksheet, requiredColumns As Variant) As Boolean
-    On Error GoTo ErrorHandler
-    
-    ValidateSheetStructure = True
-    
-    If ws Is Nothing Then
-        LogMessage "ERROR: Worksheet is Nothing in ValidateSheetStructure"
-        ValidateSheetStructure = False
-        Exit Function
-    End If
-    
-    Dim i As Integer
-    Dim colFound As Boolean
-    
-    For i = 0 To UBound(requiredColumns)
-        colFound = (FindColumn(ws, requiredColumns(i)) > 0)
-        If Not colFound Then
-            LogMessage "ERROR: Required column '" & requiredColumns(i) & "' not found in sheet '" & ws.name & "'"
-            ValidateSheetStructure = False
-        End If
-    Next i
-    
-    Exit Function
-    
-ErrorHandler:
-    LogMessage "ERROR in ValidateSheetStructure: " & Err.description
-    ValidateSheetStructure = False
-End Function
-
-Function GetWorkbookProtectionState(wb As Workbook) As Boolean
-    On Error Resume Next
-    GetWorkbookProtectionState = wb.ProtectStructure Or wb.ProtectWindows
-    On Error GoTo 0
-End Function
-
-Sub VerifyDataIntegrity(wb As Workbook)
-    On Error GoTo ErrorHandler
-    
-    LogMessage "=== Verifying Data Integrity ==="
-    
-    Dim wsSubjects As Worksheet
-    Set wsSubjects = wb.Sheets("SubjectList")
-    If Not wsSubjects Is Nothing Then
-        Dim lastRow As Long
-        lastRow = wsSubjects.Cells(wsSubjects.Rows.Count, "B").End(xlUp).Row
-        If lastRow < 2 Then
-            LogMessage "WARNING: SubjectList appears to be empty (no data rows)"
-        Else
-            LogMessage "SubjectList has " & (lastRow - 1) & " data rows"
-        End If
-    End If
-    
-    Dim wsAssessment As Worksheet
-    Set wsAssessment = wb.Sheets("assessment data parsed")
-    If Not wsAssessment Is Nothing Then
-        lastRow = wsAssessment.Cells(wsAssessment.Rows.Count, "A").End(xlUp).Row
-        If lastRow < 2 Then
-            LogMessage "WARNING: assessment data parsed appears to be empty"
-        Else
-            LogMessage "assessment data parsed has " & (lastRow - 1) & " data rows"
-        End If
-    End If
-    
-    Dim wsTeaching As Worksheet
-    Set wsTeaching = wb.Sheets("teaching stream")
-    If Not wsTeaching Is Nothing Then
-        lastRow = wsTeaching.Cells(wsTeaching.Rows.Count, "B").End(xlUp).Row
-        If lastRow < 2 Then
-            LogMessage "WARNING: teaching stream appears to be empty"
-        Else
-            LogMessage "teaching stream has " & (lastRow - 1) & " data rows"
-        End If
-    End If
-    
-    LogMessage "Data integrity check complete"
-    Exit Sub
-    
-ErrorHandler:
-    LogMessage "ERROR in VerifyDataIntegrity: " & Err.description
-End Sub
-
-Sub EnableRealTimeLogging()
-    MsgBox "Real-time logging will be enabled for the next run." & vbCrLf & vbCrLf & _
-           "Note: This will slow down execution but allows you to see progress in real-time." & vbCrLf & vbCrLf & _
-           "To disable, change ENABLE_REALTIME_LOG constant to False.", vbInformation
-End Sub
-
-Sub DisableRealTimeLogging()
-    MsgBox "Real-time logging will be disabled for the next run." & vbCrLf & vbCrLf & _
-           "Log will be updated after the macro completes." & vbCrLf & vbCrLf & _
-           "To enable, change ENABLE_REALTIME_LOG constant to True.", vbInformation
-End Sub
-
-
