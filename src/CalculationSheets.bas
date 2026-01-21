@@ -578,17 +578,24 @@ Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Dou
     
     Call CreateHeaders(wsOutput)
     
-    wsOutput.Range("D2").Value = "(automatic)"
-    wsOutput.Range("J2").Value = wordBench & " words/hr"
-    wsOutput.Range("J3").Value = examBench & " exams/hr"
-    wsOutput.Range("P2").Value = markingSupportBench & " hrs/stream"
+    ' Benchmark labels in header rows
+    Dim benchmarkCells As Variant
+    benchmarkCells = Array("D2", "(automatic)", "J2", wordBench & " words/hr", "J3", examBench & " exams/hr", "P2", "(manual)", "Q2", markingSupportBench & " hrs/stream")
     
-    wsOutput.Range("Y2").Value = wordBench & " words/hr"
-    wsOutput.Range("Y3").Value = examBench & " exams/hr"
-    wsOutput.Range("AH2").Value = wordBench & " words/hr"
-    wsOutput.Range("AH3").Value = examBench & " exams/hr"
-    wsOutput.Range("AR2").Value = wordBench & " words/hr"
-    wsOutput.Range("AR3").Value = examBench & " exams/hr"
+    Dim i As Long
+    For i = LBound(benchmarkCells) To UBound(benchmarkCells) Step 2
+        wsOutput.Range(benchmarkCells(i)).Value = benchmarkCells(i + 1)
+    Next i
+    
+    ' Marker block benchmarks (repeated 3 times)
+    Dim markerBenchmarkCols As Variant
+    markerBenchmarkCols = Array("Z", "AI", "AS")
+    
+    For i = LBound(markerBenchmarkCols) To UBound(markerBenchmarkCols)
+        wsOutput.Range(markerBenchmarkCols(i) & "2").Value = wordBench & " words/hr"
+        wsOutput.Range(markerBenchmarkCols(i) & "3").Value = examBench & " exams/hr"
+    Next i
+
     
     wsOutput.Columns("A:A").Hidden = True
     wsOutput.Range("E4").Select
@@ -632,13 +639,16 @@ Sub CreateHeaders(ws As Worksheet)
     On Error GoTo ErrorHandler
     
     Dim headers As Variant
-    headers = Array("UID", "Subject Code", "Study Period", "Enrolment #", "Assessment Details", _
-                    "Word Count", "Exam", "Group Size", "Assessment Quantity", "Marking Hours", _
-                    "Assessment Notes", "Lecturer/Instructors", "Status", "Stream #", "Activity Code", _
-                    "Allocated Marking", "Marking Support Hours Available", "Lecturer Notes", _
-                    "Marker 1", "Assessment Details", "Word Count", "Exam", "Group Size", "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested", _
-                    "Marker 2", "Assessment Details", "Word Count", "Exam", "Group Size", "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested", _
-                    "Marker 3", "Assessment Details", "Word Count", "Exam", "Group Size", "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested")
+    headers = Array("UID", "Subject Code", "Study Period", "Enrolment", "Assessment Details", _
+        "Word Count", "Exam", "Group Size", "Assessment Quantity", "Marking Hours", "Assessment Notes", _
+        "Lecturer/Instructors", "Status", "Stream #", "Activity Code", _
+        "Stream(s) Enrolment", "Allocated Marking", "Marking Support Hours Available", "Lecturer Notes", _
+        "Marker 1", "Assessment Details", "Word Count", "Exam", "Group Size", _
+        "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested", _
+        "Marker 2", "Assessment Details", "Word Count", "Exam", "Group Size", _
+        "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested", _
+        "Marker 3", "Assessment Details", "Word Count", "Exam", "Group Size", _
+        "Assessment Quantity", "Marking Allocation", "Email", "Arrangement Notes", "Contract Requested")
     
     Dim i As Integer
     For i = 0 To UBound(headers)
@@ -646,13 +656,13 @@ Sub CreateHeaders(ws As Worksheet)
         ws.Cells(1, i + 1).Font.Bold = True
         ws.Cells(1, i + 1).WrapText = True
     Next i
-    
     ws.Rows(1).RowHeight = 30
-    Exit Sub
     
+    Exit Sub
 ErrorHandler:
     LogMessage "ERROR in CreateHeaders: " & Err.description
 End Sub
+
 
 Function GetFilteredSubjectsWithAssessments(wb As Workbook, groupedPeriod As String) As Collection
     On Error GoTo ErrorHandler
@@ -1058,9 +1068,9 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     markerFormulaQueue.add markerInfo3
     
     ' Add checkboxes
-    Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 1)
-    Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 2)
-    Call AddMarkerCheckboxes(wsOutput, subjectStartRow, 3)
+    Call SetContractDropdown(wsOutput, subjectStartRow, 1)
+    Call SetContractDropdown(wsOutput, subjectStartRow, 2)
+    Call SetContractDropdown(wsOutput, subjectStartRow, 3)
     
     currentRow = subjectEndRow + 1
     
@@ -1072,30 +1082,27 @@ ErrorHandler:
     ProcessSubject = False
 End Function
 
-
 ' Helper function to build assessment quantity formula
 Function BuildAssessmentQuantityFormula(rowNum As Long, assessUID As String, subjectCode As String, studyPeriod As String) As String
     ' This builds the VLOOKUP formula for assessment quantity
     BuildAssessmentQuantityFormula = "=IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""" & studyPeriod & """)),9,FALSE),IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""All"")),9,FALSE),""""))"
 End Function
 
-
-
-Sub AddMarkerCheckboxes(wsOutput As Worksheet, subjectStartRow As Long, markerNum As Integer)
+Sub SetContractDropdown(wsOutput As Worksheet, subjectStartRow As Long, markerNum As Integer)
     On Error GoTo ErrorHandler
     
-    ' Add data validation dropdown to first assessment row (_1), not header (_0)
+    ' Add data validation dropdown to first assessment row (+1, not header 0)
     Dim targetRow As Long
     targetRow = subjectStartRow + 1  ' First assessment row
     
     Dim contractCol As Integer
     Select Case markerNum
         Case 1
-            contractCol = 28  ' Column AB
+            contractCol = 29  ' Column AC (was AB=28, shifted +1)
         Case 2
-            contractCol = 38  ' Column AL
+            contractCol = 39  ' Column AM (was AL=38, shifted +1)
         Case 3
-            contractCol = 48  ' Column AV
+            contractCol = 49  ' Column AW (was AV=48, shifted +1)
     End Select
     
     ' Add data validation dropdown with Yes/No options
@@ -1110,17 +1117,14 @@ Sub AddMarkerCheckboxes(wsOutput As Worksheet, subjectStartRow As Long, markerNu
     ' Add dropdown list validation
     With cellObj.Validation
         .Delete
-        .add Type:=xlValidateList, _
-             AlertStyle:=xlValidAlertStop, _
-             Operator:=xlBetween, _
-             Formula1:="N,Y"
+        .add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="N,Y"
         .IgnoreBlank = True
         .InCellDropdown = True
         .ShowInput = True
         .ShowError = False
     End With
     
-    ' Set default value to "No"
+    ' Set default value to No
     If cellObj.Value = "" Then
         cellObj.Value = "N"
     End If
@@ -1133,23 +1137,25 @@ Sub AddMarkerCheckboxes(wsOutput As Worksheet, subjectStartRow As Long, markerNu
     Exit Sub
     
 ErrorHandler:
-    LogMessage "ERROR in AddMarkerCheckboxes: " & Err.description
+    LogMessage "ERROR in SetContractDropdown: " & Err.description
 End Sub
 
-Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subjectEndRow As Long, markerNum As Integer, subjectCode As String, studyPeriod As String)
+Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subjectEndRow As Long, _
+    markerNum As Integer, subjectCode As String, studyPeriod As String)
+    
     On Error GoTo ErrorHandler
     
     Dim baseCol As Integer, benchmarkCol As Integer
     Select Case markerNum
         Case 1
-            baseCol = 19  ' Column S
-            benchmarkCol = 25  ' Column Y
+            baseCol = 20   ' Column T (shifted +1 from S)
+            benchmarkCol = 26  ' Column Z (shifted +1 from Y)
         Case 2
-            baseCol = 29  ' Column AC
-            benchmarkCol = 35  ' Column AI
+            baseCol = 30   ' Column AD (shifted +1 from AC)
+            benchmarkCol = 36  ' Column AJ (shifted +1 from AI)
         Case 3
-            baseCol = 39  ' Column AM
-            benchmarkCol = 44  ' Column AR
+            baseCol = 40   ' Column AN (shifted +1 from AM)
+            benchmarkCol = 45  ' Column AS (shifted +1 from AR)
     End Select
     
     Dim detailsCol As Integer, wordCol As Integer, examCol As Integer
@@ -1164,7 +1170,7 @@ Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subje
     
     ' Calculate number of rows EXCLUDING the header row
     Dim numRows As Long
-    numRows = subjectEndRow - subjectStartRow  ' Changed from +1
+    numRows = subjectEndRow - subjectStartRow
     
     ' BUILD FORMULA ARRAYS in memory
     Dim wordFormulas As Variant
@@ -1191,7 +1197,7 @@ Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subje
     
     ' Start from subjectStartRow + 1 (skip header row)
     For r = subjectStartRow + 1 To subjectEndRow
-        arrayRow = r - subjectStartRow  ' Adjusted offset
+        arrayRow = r - subjectStartRow
         
         If wsOutput.Cells(r, 5).Value = "Total" Then
             ' Total row - write "Total" text and SUM formula
@@ -1208,7 +1214,10 @@ Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subje
             
             qtyFormulas(arrayRow, 1) = "=IF(" & detailColLetter & r & "="""","""",0)"
             
-            allocFormulas(arrayRow, 1) = "=IF(" & qtyColLetter & r & "="""","""", IF(ISNUMBER(" & qtyColLetter & r & "), IF(ISNUMBER(" & wordColLetter & r & "), " & qtyColLetter & r & "*" & wordColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$2,FIND("" "",$" & benchmarkColLetter & "$2)-1)), IF(ISNUMBER(" & examColLetter & r & "), " & qtyColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$3,FIND("" "",$" & benchmarkColLetter & "$3)-1)),"""")), " & qtyColLetter & r & "))"
+            ' UPDATED ALLOCATION FORMULA:
+            ' If qty has number AND (word OR exam OR group are all empty) ? return qty value
+            ' Otherwise ? calculate as before
+            allocFormulas(arrayRow, 1) = "=IF(" & qtyColLetter & r & "="""","""", IF(ISNUMBER(" & qtyColLetter & r & "), IF(AND(" & wordColLetter & r & "="""", " & examColLetter & r & "=""""), " & qtyColLetter & r & ", IF(ISNUMBER(" & wordColLetter & r & "), " & qtyColLetter & r & "*" & wordColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$2,FIND("" "",$" & benchmarkColLetter & "$2)-1)), IF(ISNUMBER(" & examColLetter & r & "), " & qtyColLetter & r & "/VALUE(LEFT($" & benchmarkColLetter & "$3,FIND("" "",$" & benchmarkColLetter & "$3)-1)),""""))), " & qtyColLetter & r & "))"
         End If
     Next r
     
@@ -1224,8 +1233,6 @@ Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subje
 ErrorHandler:
     LogMessage "ERROR in SetMarkerBlockFormulas: " & Err.description
 End Sub
-
-
 
 Function ColLetter(colNum As Integer) As String
     ColLetter = Split(Cells(1, colNum).Address, "$")(1)
@@ -1451,7 +1458,7 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
         wsOutput.Cells(startRow, 12).Font.Bold = True
     End If
     
-    ' BUILD FORMULA ARRAYS for columns P and Q
+    ' BUILD FORMULA ARRAYS for columns Q and R (shifted from P and Q)
     Dim formulas() As Variant
     ReDim formulas(1 To lecturers.Count, 1 To 2)
     
@@ -1459,15 +1466,17 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
     For i = 1 To lecturers.Count
         currentRow = startRow + i - 1
         
-        ' Column P (16): Allocated Marking
-        formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($P$2,FIND("" "",$P$2)-1)),"""")"
+        ' Column Q (17): Allocated Marking formula
+        formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
         
-        ' Column Q (17): Marking Support Hours Available
-        formulas(i, 2) = "=IF(P" & currentRow & "="""","""",$J$" & totalRow & "-P" & currentRow & ")"
+        ' Column R (18): Marking Support Hours Available formula (UPDATED)
+        ' =IF(Q12="","",$J$16*(P12/D11)-Q12)
+        ' New: =IF(R12="","",$J$totalRow*(P12/D11)-R12)
+        formulas(i, 2) = "=IF(Q" & currentRow & "="""","""",$J$" & totalRow & "*(P" & currentRow & "/D" & (startRow - 1) & ")-Q" & currentRow & ")"
     Next i
     
-    ' BATCH WRITE both formulas at once
-    wsOutput.Cells(startRow, 16).Resize(lecturers.Count, 2).Formula = formulas
+    ' BATCH WRITE both formulas at once (columns Q and R, shifted from 16-17 to 17-18)
+    wsOutput.Cells(startRow, 17).Resize(lecturers.Count, 2).Formula = formulas
     
     Exit Sub
     
@@ -1637,90 +1646,72 @@ Sub FormatSheet(ws As Worksheet)
     Err.Clear
     On Error GoTo ErrorHandler
     
-    ' ... (Keep all column width settings - unchanged)
-    ws.Columns("A:A").ColumnWidth = 25
-    ws.Columns("B:C").ColumnWidth = 15
-    ws.Columns("D:D").ColumnWidth = 11.5
-    ws.Columns("E:E").ColumnWidth = 60
-    ws.Columns("F:H").ColumnWidth = 7
-    ws.Columns("I:J").ColumnWidth = 10.5
-    ws.Columns("K:K").ColumnWidth = 30
-    ws.Columns("L:L").ColumnWidth = 30
-    ws.Columns("M:M").ColumnWidth = 11.75
-    ws.Columns("N:N").ColumnWidth = 6.5
-    ws.Columns("O:O").ColumnWidth = 25
-    ws.Columns("P:Q").ColumnWidth = 14
-    ws.Columns("R:R").ColumnWidth = 30
+    ' =================================================================
+    ' COLUMN WIDTHS
+    ' =================================================================
+    Dim widths As Variant
+    widths = Array("A:A", 25, "B:C", 15, "D:D", 11.5, "E:E", 60, "F:H", 7, "I:J", 10.5, "K:L", 30, "M:M", 11.75, "N:N", 6.5, "O:O", 25, "P:Q", 14, "R:S", 30, "T:T", 60, "U:W", 7, "X:Y", 13, "Z:AA", 30, "AB:AB", 10, "AC:AC", 30, "AD:AD", 60, "AE:AG", 7, "AH:AI", 13, "AJ:AK", 30, "AL:AL", 10, "AM:AM", 30, "AN:AN", 60, "AO:AQ", 7, "AR:AS", 13, "AT:AU", 30, "AV:AV", 10)
     
-    ws.Columns("S:S").ColumnWidth = 30
-    ws.Columns("T:T").ColumnWidth = 60
-    ws.Columns("U:W").ColumnWidth = 7
-    ws.Columns("X:Y").ColumnWidth = 13
-    ws.Columns("Z:AA").ColumnWidth = 30
-    ws.Columns("AB:AB").ColumnWidth = 10
+    Dim i As Long
+    For i = LBound(widths) To UBound(widths) Step 2
+        ws.Columns(widths(i)).ColumnWidth = widths(i + 1)
+    Next i
     
-    ws.Columns("AC:AC").ColumnWidth = 30
-    ws.Columns("AD:AD").ColumnWidth = 60
-    ws.Columns("AE:AG").ColumnWidth = 7
-    ws.Columns("AH:AI").ColumnWidth = 13
-    ws.Columns("AJ:AK").ColumnWidth = 30
-    ws.Columns("AL:AL").ColumnWidth = 10
+    ' =================================================================
+    ' NUMBER FORMATS
+    ' =================================================================
+    Dim numFormats As Variant
+    numFormats = Array("D:D", "0", "F:I", "0", "J:J", "0.00", "N:N", "0", "P:P", "0", "Q:Q", "0.00", "U:X", "0", "Y:Y", "0.00", "AE:AH", "0", "AI:AI", "0.00", "AO:AR", "0", "AS:AS", "0.00")
     
-    ws.Columns("AM:AM").ColumnWidth = 30
-    ws.Columns("AN:AN").ColumnWidth = 60
-    ws.Columns("AO:AQ").ColumnWidth = 7
-    ws.Columns("AR:AS").ColumnWidth = 13
-    ws.Columns("AT:AU").ColumnWidth = 30
-    ws.Columns("AV:AV").ColumnWidth = 10
+    For i = LBound(numFormats) To UBound(numFormats) Step 2
+        ws.Columns(numFormats(i)).NumberFormat = numFormats(i + 1)
+    Next i
     
-    ' ... (Keep wrap text settings - unchanged)
-    ws.Columns("E:E").WrapText = True
-    ws.Columns("R:R").WrapText = True
-    ws.Columns("T:T").WrapText = True
-    ws.Columns("AA:AB").WrapText = True
-    ws.Columns("AD:AD").WrapText = True
-    ws.Columns("AJ:AL").WrapText = True
-    ws.Columns("AN:AN").WrapText = True
-    ws.Columns("AT:AV").WrapText = True
+    ' =================================================================
+    ' HORIZONTAL ALIGNMENT
+    ' =================================================================
+    Dim centerCols As Variant
+    centerCols = Array("D:D", "F:J", "N:N", "P:Q", "U:Y", "AB:AB", "AE:AI", "AL:AL", "AO:AS", "AV:AV")
     
+    For i = LBound(centerCols) To UBound(centerCols)
+        ws.Columns(centerCols(i)).HorizontalAlignment = xlCenter
+    Next i
+    
+    ' =================================================================
+    ' WRAP TEXT
+    ' =================================================================
+    Dim wrapCols As Variant
+    wrapCols = Array("E:E", "R:R", "T:T", "AA:AB", "AD:AD", "AJ:AL", "AN:AN", "AT:AV")
+    
+    For i = LBound(wrapCols) To UBound(wrapCols)
+        ws.Columns(wrapCols(i)).WrapText = True
+    Next i
+    
+    ' =================================================================
+    ' HIDDEN COLUMNS
+    ' =================================================================
+    ws.Columns("A:A").Hidden = True
+    
+    ' =================================================================
+    ' LOCKED COLUMNS
+    ' =================================================================
+    ws.Cells.Locked = False
+    
+    Dim lockedCols As Variant
+    lockedCols = Array("B:C", "E:E", "F:H", "J:J", "Q:Q")
+    
+    For i = LBound(lockedCols) To UBound(lockedCols)
+        ws.Columns(lockedCols(i)).Locked = True
+    Next i
+    
+    ' =================================================================
+    ' SPECIAL FORMATTING
+    ' =================================================================
     ws.Columns("B:B").Font.Bold = True
     
-    ' ... (Keep number formats - unchanged)
-    ws.Columns("D:D").NumberFormat = "0"
-    ws.Columns("F:F").NumberFormat = "0"
-    ws.Columns("G:G").NumberFormat = "0"
-    ws.Columns("H:H").NumberFormat = "0"
-    ws.Columns("I:I").NumberFormat = "0"
-    ws.Columns("J:J").NumberFormat = "0.00"
-    ws.Columns("N:N").NumberFormat = "0"
-    ws.Columns("P:Q").NumberFormat = "0.00"
-    
-    ws.Columns("U:W").NumberFormat = "0"
-    ws.Columns("X:X").NumberFormat = "0"
-    ws.Columns("Y:Y").NumberFormat = "0.00"
-    ws.Columns("AE:AG").NumberFormat = "0"
-    ws.Columns("AH:AH").NumberFormat = "0"
-    ws.Columns("AI:AI").NumberFormat = "0.00"
-    ws.Columns("AO:AQ").NumberFormat = "0"
-    ws.Columns("AR:AR").NumberFormat = "0"
-    ws.Columns("AS:AS").NumberFormat = "0.00"
-    
-    ws.Columns("A:A").Hidden = True
-    ws.Columns("D:D").HorizontalAlignment = xlCenter
-    ws.Columns("F:J").HorizontalAlignment = xlCenter
-    ws.Columns("N:N").HorizontalAlignment = xlCenter
-    ws.Columns("P:Q").HorizontalAlignment = xlCenter
-    
-    ws.Columns("U:Y").HorizontalAlignment = xlCenter
-    ws.Columns("AE:AI").HorizontalAlignment = xlCenter
-    ws.Columns("AO:AS").HorizontalAlignment = xlCenter
-    
-    ' CENTER ALIGN CONTRACT REQUESTED COLUMNS
-    ws.Columns("AB:AB").HorizontalAlignment = xlCenter  ' Marker 1
-    ws.Columns("AL:AL").HorizontalAlignment = xlCenter  ' Marker 2
-    ws.Columns("AV:AV").HorizontalAlignment = xlCenter  ' Marker 3
-    
-    ' ... (Keep conditional formatting and protection - unchanged)
+    ' =================================================================
+    ' CONDITIONAL FORMATTING (Continuing T&R)
+    ' =================================================================
     Dim lastRow As Long
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
     
@@ -1739,18 +1730,51 @@ Sub FormatSheet(ws As Worksheet)
         End With
     End If
     
-    ws.Cells.Locked = False
-    ws.Columns("B:C").Locked = True
-    ws.Columns("E:E").Locked = True
-    ws.Columns("F:H").Locked = True
-    ws.Columns("J:J").Locked = True
-    ws.Columns("P:Q").Locked = True
+    ' =================================================================
+    ' MARKER BLOCKS (Consolidated - 3 identical blocks)
+    ' =================================================================
+    Dim markerBaseCol As Variant
+    Dim markerWidths As Variant
+    Dim centerOffsets As Variant
+    Dim wrapOffsets As Variant
     
+    markerBaseCol = Array(20, 30, 40)
+    markerWidths = Array(60, 7, 7, 7, 13, 13, 30, 30, 10)
+    centerOffsets = Array(1, 2, 3, 4, 5, 8)
+    wrapOffsets = Array(0, 6, 7)
+    
+    Dim m As Integer, baseCol As Integer, offset As Integer
+    
+    For m = 0 To 2
+        baseCol = markerBaseCol(m)
+        
+        ' Column widths
+        For offset = 0 To UBound(markerWidths)
+            ws.Columns(baseCol + offset).ColumnWidth = markerWidths(offset)
+        Next offset
+        
+        ' Number formats (cols 1-5, with col 5 being decimal)
+        For offset = 1 To 5
+            ws.Columns(baseCol + offset).NumberFormat = IIf(offset = 5, "0.00", "0")
+        Next offset
+        
+        ' Center alignment
+        For offset = 0 To UBound(centerOffsets)
+            ws.Columns(baseCol + centerOffsets(offset)).HorizontalAlignment = xlCenter
+        Next offset
+        
+        ' Wrap text
+        For offset = 0 To UBound(wrapOffsets)
+            ws.Columns(baseCol + wrapOffsets(offset)).WrapText = True
+        Next offset
+    Next m
+
+    
+    ' =================================================================
+    ' SHEET PROTECTION
+    ' =================================================================
     On Error Resume Next
-    ws.Protect DrawingObjects:=False, Contents:=True, Scenarios:=False, _
-                AllowFormattingCells:=True, AllowFormattingColumns:=True, _
-                AllowFormattingRows:=True, AllowInsertingRows:=False, _
-                AllowDeletingRows:=False
+    ws.Protect DrawingObjects:=False, Contents:=True, Scenarios:=False, AllowFormattingCells:=True, AllowFormattingColumns:=True, AllowFormattingRows:=True, AllowInsertingRows:=False, AllowDeletingRows:=False
     
     If Err.Number <> 0 Then
         LogMessage "WARNING: Could not protect sheet " & ws.name & ": " & Err.description
