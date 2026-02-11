@@ -35,7 +35,7 @@ Sub InitializeProcessLog(wb As Workbook)
     On Error GoTo ErrorHandler
     Application.ScreenUpdating = False
     
-    Set tempLog = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.Count))
+    Set tempLog = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.count))
     
     On Error Resume Next
     tempLog.name = "Process Log"
@@ -88,29 +88,31 @@ ErrorHandler:
 End Sub
 
 Sub LogMessage(msg As String, Optional elapsedTime As Double = -1)
-    On Error GoTo ErrorHandler
+    ' Always write to Debug first (never fails)
+    Debug.Print msg
     
+    ' Try status bar
+    On Error Resume Next
     If LOG_TO_STATUSBAR Then
         Application.StatusBar = "Processing: " & Left(msg, 100)
     End If
     
+    ' Try writing to log sheet (don't crash if it fails)
     If Not wsLog Is Nothing Then
         Dim origScreenUpdating As Boolean
         origScreenUpdating = Application.ScreenUpdating
         
-        If ENABLE_REALTIME_LOG Then
-            Application.ScreenUpdating = True
-        End If
+        If ENABLE_REALTIME_LOG Then Application.ScreenUpdating = True
         
-        Dim nextRow As Long
-        nextRow = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row + 1
+        Dim NextRow As Long
+        NextRow = wsLog.Cells(wsLog.Rows.count, 1).End(xlUp).Row + 1
         
-        wsLog.Cells(nextRow, 1).Value = Now
-        wsLog.Cells(nextRow, 2).Value = msg
+        wsLog.Cells(NextRow, 1).Value = Now
+        wsLog.Cells(NextRow, 2).Value = msg
         If elapsedTime >= 0 Then
-            wsLog.Cells(nextRow, 3).Value = Format(elapsedTime, "0.00") & "s"
+            wsLog.Cells(NextRow, 3).Value = Format(elapsedTime, "0.00") & "s"
         End If
-        wsLog.Cells(nextRow, 2).WrapText = True
+        wsLog.Cells(NextRow, 2).WrapText = True
         
         If ENABLE_REALTIME_LOG Then
             DoEvents
@@ -118,11 +120,6 @@ Sub LogMessage(msg As String, Optional elapsedTime As Double = -1)
         End If
     End If
     
-    Debug.Print msg
-    Exit Sub
-    
-ErrorHandler:
-    Debug.Print "ERROR in LogMessage: " & Err.description
     On Error GoTo 0
 End Sub
 
@@ -199,6 +196,40 @@ Sub GenerateCalculationSheets()
     
     LogMessage "=== Starting GenerateCalculationSheets ==="
     LogMessage "Workbook: " & wb.name
+    
+    ' ========================================================================
+    ' Clean up any existing calculation sheets BEFORE generation
+    ' ========================================================================
+    LogMessage "Checking for existing calculation sheets..."
+    
+    Dim existingFHY As Worksheet, existingSHY As Worksheet
+    
+    ' Delete FHY if exists
+    Set existingFHY = Nothing
+    On Error Resume Next
+    Set existingFHY = wb.Sheets("FHY Calculations")
+    On Error GoTo ErrorHandler
+    
+    If Not existingFHY Is Nothing Then
+        Application.DisplayAlerts = False
+        existingFHY.Delete
+        Application.DisplayAlerts = True
+        LogMessage "Deleted existing FHY Calculations sheet"
+    End If
+    
+    ' Delete SHY if exists
+    Set existingSHY = Nothing
+    On Error Resume Next
+    Set existingSHY = wb.Sheets("SHY Calculations")
+    On Error GoTo ErrorHandler
+    
+    If Not existingSHY Is Nothing Then
+        Application.DisplayAlerts = False
+        existingSHY.Delete
+        Application.DisplayAlerts = True
+        LogMessage "Deleted existing SHY Calculations sheet"
+    End If
+    ' ========================================================================
     
     If Not VerifyRequiredSheets(wb) Then
         GoTo CleanExit
@@ -286,6 +317,9 @@ ErrorHandler:
     
     Dim errMsg As String
     errMsg = "Error in GenerateCalculationSheets: " & Err.description & " (Error " & Err.Number & ")"
+    
+    ' Use Debug.Print if LogMessage fails
+    Debug.Print errMsg
     LogMessage errMsg
     
     Call CleanupPartialSheets(wb)
@@ -301,17 +335,23 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     Application.ScreenUpdating = False
     LogMessage "ExportCalculationSheets: Starting"
     
+    ' ========================================================================
+    ' STEP 1: Validate inputs
+    ' ========================================================================
     Dim yearValue As Variant
     yearValue = wb.Sheets("Dashboard").Range("C2").Value
+    
     If Not IsNumeric(yearValue) Or yearValue = "" Then
-        LogMessage "ERROR: Invalid year value in Dashboard C2: " & yearValue
-        MsgBox "Invalid year value in Dashboard sheet (cell C2).", vbCritical
+        LogMessage "ERROR: Invalid year value"
         Exit Function
     End If
     
     Dim newFileName As String
-    newFileName = CStr(yearValue) & " Marking & Admin Support Calculations"
+    newFileName = CStr(yearValue) & " Marking Admin Support Calculations"
     
+    ' ========================================================================
+    ' STEP 2: Find sheets
+    ' ========================================================================
     Dim wsFHY As Worksheet, wsSHY As Worksheet
     On Error Resume Next
     Set wsFHY = wb.Sheets("FHY Calculations")
@@ -319,52 +359,50 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     On Error GoTo ErrorHandler
     
     If wsFHY Is Nothing And wsSHY Is Nothing Then
-        LogMessage "ERROR: No calculation sheets found to export"
-        MsgBox "No calculation sheets found to export.", vbCritical
+        LogMessage "ERROR: No calculation sheets found"
         Exit Function
     End If
     
+    ' ========================================================================
+    ' STEP 3: Create and populate new workbook
+    ' ========================================================================
     Dim newWB As Workbook
     Set newWB = Workbooks.add
+    LogMessage "Created new workbook"
     
+    ' Clean up extra sheets
     Application.DisplayAlerts = False
     On Error Resume Next
-    Do While newWB.Sheets.Count > 1
-        newWB.Sheets(newWB.Sheets.Count).Delete
+    Do While newWB.Sheets.count > 1
+        newWB.Sheets(newWB.Sheets.count).Delete
     Loop
     Application.DisplayAlerts = True
     On Error GoTo ErrorHandler
     
+    ' Copy calculation sheets
     If Not wsFHY Is Nothing Then
         wsFHY.Copy Before:=newWB.Sheets(1)
-        
-        Dim copiedFHY As Worksheet
-        Set copiedFHY = newWB.Sheets(1)
-        If copiedFHY.name <> "FHY Calculations" Then
-            LogMessage "WARNING: FHY sheet name mismatch after copy: " & copiedFHY.name
-        Else
-            LogMessage "Copied FHY Calculations sheet"
-        End If
+        LogMessage "Copied FHY Calculations"
     End If
     
     If Not wsSHY Is Nothing Then
-        wsSHY.Copy After:=newWB.Sheets(newWB.Sheets.Count)
-        LogMessage "Copied SHY Calculations sheet"
+        wsSHY.Copy After:=newWB.Sheets(newWB.Sheets.count)
+        LogMessage "Copied SHY Calculations"
     End If
     
+    ' Remove any blank sheets
     Application.DisplayAlerts = False
     On Error Resume Next
     Dim i As Integer
-    For i = newWB.Sheets.Count To 1 Step -1
-        If newWB.Sheets(i).name <> "FHY Calculations" And _
-           newWB.Sheets(i).name <> "SHY Calculations" Then
+    For i = newWB.Sheets.count To 1 Step -1
+        If newWB.Sheets(i).name <> "FHY Calculations" And newWB.Sheets(i).name <> "SHY Calculations" Then
             newWB.Sheets(i).Delete
         End If
     Next i
     Application.DisplayAlerts = True
     On Error GoTo ErrorHandler
     
-    If newWB.Sheets.Count = 0 Then
+    If newWB.Sheets.count = 0 Then
         LogMessage "ERROR: No sheets in exported workbook"
         newWB.Close SaveChanges:=False
         Exit Function
@@ -372,81 +410,123 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     
     newWB.Application.Calculation = xlCalculationAutomatic
     
-    Dim savePath As String
-    Dim sourceFilePath As String
-    Dim basePath As String
-    sourceFilePath = wb.FullName
+    ' ========================================================================
+    ' STEP 4: Copy VBA module FIRST (creates VBA project)
+    ' ========================================================================
+    LogMessage "Step 4: Checking for VBA module to copy..."
     
-    If InStr(1, sourceFilePath, "http://", vbTextCompare) > 0 Or _
-       InStr(1, sourceFilePath, "https://", vbTextCompare) > 0 Then
-        Dim lastSlash As Long
-        lastSlash = InStrRev(sourceFilePath, "/")
-        If lastSlash > 0 Then
-            basePath = Left(sourceFilePath, lastSlash)
-        Else
-            basePath = wb.Path & "/"
-        End If
+    Dim hasVBA As Boolean
+    hasVBA = False
+    
+    If CopyVBAModuleIfExists(wb, newWB, "LecturerRefresh") Then
+        LogMessage "Step 4: SUCCESS - VBA module copied"
+        hasVBA = True
+        
+        Call AddRefreshButtonsToSheets(newWB)
     Else
-        basePath = wb.Path & Application.PathSeparator
+        LogMessage "No VBA module found in source - will save as XLSX"
     End If
     
-    savePath = GetUniqueFilename(basePath, newFileName, ".xlsx")
+    ' ========================================================================
+    ' STEP 5: Determine save path
+    ' ========================================================================
+    Dim savePath As String
+    Dim folderPath As String
+    
+    folderPath = wb.Path
+    If folderPath = "" Then
+        LogMessage "ERROR: Could not determine workbook folder"
+        newWB.Close SaveChanges:=False
+        Exit Function
+    End If
+    
+    ' Add appropriate path separator (works on both platforms)
+    Dim pathSep As String
+    pathSep = Application.PathSeparator  ' Automatically "/" on Mac, "\" on Windows
+    
+    If Right(folderPath, 1) <> pathSep Then
+        folderPath = folderPath & pathSep
+    End If
+    
+    ' Use appropriate extension based on whether VBA exists
+    Dim fileExt As String
+    Dim fileFormat As Long
+    
+    If hasVBA Then
+        fileExt = ".xlsm"
+        fileFormat = xlOpenXMLWorkbookMacroEnabled
+        LogMessage "Will save as XLSM (has VBA)"
+    Else
+        fileExt = ".xlsx"
+        fileFormat = xlOpenXMLWorkbook
+        LogMessage "Will save as XLSX (no VBA)"
+    End If
+    
+    savePath = folderPath & newFileName & fileExt
     LogMessage "Target save path: " & savePath
     
+    ' ========================================================================
+    ' STEP 6: Save directly to SharePoint
+    ' ========================================================================
+    LogMessage "Attempting to save..."
+    
     On Error Resume Next
-    newWB.SaveAs FileName:=savePath, FileFormat:=xlOpenXMLWorkbook
+    newWB.SaveAs FileName:=savePath, fileFormat:=fileFormat
     
     If Err.Number <> 0 Then
-        Dim saveErr As Long
-        saveErr = Err.Number
-        LogMessage "Save failure in primary location (Code " & saveErr & ") Path: " & savePath
+        Dim saveErrNum As Long
+        Dim saveErrDesc As String
+        saveErrNum = Err.Number
+        saveErrDesc = Err.description
         
+        LogMessage "ERROR: SaveAs failed - " & saveErrNum & " " & saveErrDesc
+        LogMessage "Failed path was: " & savePath
+        LogMessage "Attempting fallback to temp location..."
+        
+        ' Fallback to temp
         Dim tempPath As String
-        Dim tempBasePath As String
-        tempBasePath = Environ("TEMP") & Application.PathSeparator
-        tempPath = GetUniqueFilename(tempBasePath, newFileName, ".xlsx")
+        tempPath = Application.DefaultFilePath
+        pathSep = Application.PathSeparator
+        
+        If Right(tempPath, 1) <> pathSep Then
+            tempPath = tempPath & pathSep
+        End If
+        
+        tempPath = tempPath & newFileName & fileExt
         
         Err.Clear
-        newWB.SaveAs FileName:=tempPath, FileFormat:=xlOpenXMLWorkbook
+        newWB.SaveAs FileName:=tempPath, fileFormat:=fileFormat
         
         If Err.Number = 0 Then
-            MsgBox "Could not save to SharePoint location." & vbCrLf & vbCrLf & _
+            MsgBox "Could not save to SharePoint." & vbCrLf & vbCrLf & _
                    "File saved to:" & vbCrLf & tempPath, vbInformation
             savePath = tempPath
             LogMessage "Saved to temp location: " & tempPath
         Else
-            LogMessage "File save failed everywhere. Path: " & tempPath
-            MsgBox "Could not save file. File not saved anywhere.", vbExclamation
+            LogMessage "ERROR: Save failed completely - " & Err.Number & " " & Err.description
             newWB.Close SaveChanges:=False
             Application.ScreenUpdating = True
             Exit Function
         End If
     Else
-        LogMessage "Saved new workbook to: " & savePath
+        LogMessage "SUCCESS: Saved to SharePoint"
     End If
     
     On Error GoTo ErrorHandler
     
+    ' ========================================================================
+    ' STEP 7: Close exported workbook
+    ' ========================================================================
     newWB.Close SaveChanges:=False
+    LogMessage "Exported workbook closed"
     
+    ' ========================================================================
+    ' STEP 8: Delete source sheets
+    ' ========================================================================
     Application.DisplayAlerts = False
     On Error Resume Next
-    If Not wsFHY Is Nothing Then
-        wb.Sheets("FHY Calculations").Delete
-        Set wsFHY = Nothing
-        Set wsFHY = wb.Sheets("FHY Calculations")
-        If Not wsFHY Is Nothing Then
-            LogMessage "WARNING: Could not delete FHY Calculations from source"
-        End If
-    End If
-    If Not wsSHY Is Nothing Then
-        wb.Sheets("SHY Calculations").Delete
-        Set wsSHY = Nothing
-        Set wsSHY = wb.Sheets("SHY Calculations")
-        If Not wsSHY Is Nothing Then
-            LogMessage "WARNING: Could not delete SHY Calculations from source"
-        End If
-    End If
+    If Not wsFHY Is Nothing Then wb.Sheets("FHY Calculations").Delete
+    If Not wsSHY Is Nothing Then wb.Sheets("SHY Calculations").Delete
     Application.DisplayAlerts = True
     On Error GoTo ErrorHandler
     
@@ -458,7 +538,7 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
 ErrorHandler:
     Application.DisplayAlerts = True
     Application.ScreenUpdating = True
-    LogMessage "ERROR in ExportCalculationSheets: " & Err.description & " (Error " & Err.Number & ")"
+    LogMessage "ERROR in ExportCalculationSheets: " & Err.Number & " - " & Err.description
     
     On Error Resume Next
     If Not newWB Is Nothing Then newWB.Close SaveChanges:=False
@@ -466,6 +546,7 @@ ErrorHandler:
     
     ExportCalculationSheets = False
 End Function
+
 
 Function GetUniqueFilename(basePath As String, baseName As String, ext As String) As String
     On Error GoTo ErrorHandler
@@ -565,7 +646,7 @@ Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Dou
     On Error GoTo ErrorHandler
     
     Dim wsOutput As Worksheet
-    Set wsOutput = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.Count - 1))
+    Set wsOutput = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.count - 1))
     wsOutput.name = sheetName
     
     Set checkSheet = Nothing
@@ -610,13 +691,13 @@ Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Dou
         Exit Function
     End If
     
-    If subjectData.Count = 0 Then
+    If subjectData.count = 0 Then
         LogMessage "WARNING: No subjects found for " & groupedPeriod
         GenerateSheet = True
         Exit Function
     End If
     
-    LogMessage "Found " & subjectData.Count & " subjects for " & groupedPeriod
+    LogMessage "Found " & subjectData.count & " subjects for " & groupedPeriod
     
     If Not PopulateSheetData(wb, wsOutput, subjectData, wordBench, examBench, markingSupportBench) Then
         LogMessage "ERROR: Failed to populate sheet data for " & groupedPeriod
@@ -682,7 +763,7 @@ Function GetFilteredSubjectsWithAssessments(wb As Workbook, groupedPeriod As Str
     End If
     
     Dim lastRow As Long
-    lastRow = wsSubjects.Cells(wsSubjects.Rows.Count, "B").End(xlUp).Row
+    lastRow = wsSubjects.Cells(wsSubjects.Rows.count, "B").End(xlUp).Row
     
     If lastRow < 2 Then
         LogMessage "WARNING: No data in SubjectList sheet"
@@ -694,7 +775,7 @@ Function GetFilteredSubjectsWithAssessments(wb As Workbook, groupedPeriod As Str
     Set assessmentDict = New Collection
     
     Dim lastAssRow As Long
-    lastAssRow = wsAssessment.Cells(wsAssessment.Rows.Count, "A").End(xlUp).Row
+    lastAssRow = wsAssessment.Cells(wsAssessment.Rows.count, "A").End(xlUp).Row
     
     Dim i As Long
     For i = 2 To lastAssRow
@@ -788,7 +869,7 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     Dim tStart As Double
     tStart = Timer
     
-    If subjectData Is Nothing Or subjectData.Count = 0 Then
+    If subjectData Is Nothing Or subjectData.count = 0 Then
         LogMessage "WARNING: No subjects to populate"
         PopulateSheetData = True
         Exit Function
@@ -848,52 +929,14 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     ' Collection to store marker formula info for batch processing
     Dim markerFormulaQueue As New Collection
     
-    ' Process subjects by category
-    If groupedPeriod = "FHY" Then
-        If summerSubjects.Count > 0 Then
-            For Each subject In summerSubjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
-                    LogMessage "ERROR: Failed to process subject in SUMMER"
-                End If
-            Next subject
-        End If
-        
-        If semester1Subjects.Count > 0 Then
-            wsOutput.Rows(currentRow).Interior.Color = RGB(0, 0, 0)
-            wsOutput.Cells(currentRow, 2).Value = "SEMESTER 1"
-            wsOutput.Cells(currentRow, 2).Font.Color = RGB(255, 255, 255)
-            wsOutput.Cells(currentRow, 2).Font.Bold = True
-            currentRow = currentRow + 1
-            
-            For Each subject In semester1Subjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
-                    LogMessage "ERROR: Failed to process subject in SEMESTER 1"
-                End If
-            Next subject
-        End If
-    Else
-        If winterSubjects.Count > 0 Then
-            For Each subject In winterSubjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
-                    LogMessage "ERROR: Failed to process subject in WINTER"
-                End If
-            Next subject
-        End If
-        
-        If semester2Subjects.Count > 0 Then
-            wsOutput.Rows(currentRow).Interior.Color = RGB(0, 0, 0)
-            wsOutput.Cells(currentRow, 2).Value = "SEMESTER 2"
-            wsOutput.Cells(currentRow, 2).Font.Color = RGB(255, 255, 255)
-            wsOutput.Cells(currentRow, 2).Font.Bold = True
-            currentRow = currentRow + 1
-            
-            For Each subject In semester2Subjects
-                If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
-                    LogMessage "ERROR: Failed to process subject in SEMESTER 2"
-                End If
-            Next subject
-        End If
-    End If
+   ' Process subjects by category
+If groupedPeriod = "FHY" Then
+    Call ProcessSubjectCollection(wb, wsOutput, summerSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "", "SUMMER")
+    Call ProcessSubjectCollection(wb, wsOutput, semester1Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "SEMESTER 1", "SEMESTER 1")
+Else
+    Call ProcessSubjectCollection(wb, wsOutput, winterSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "", "WINTER")
+    Call ProcessSubjectCollection(wb, wsOutput, semester2Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "SEMESTER 2", "SEMESTER 2")
+End If
     
     ' NOW APPLY ALL MARKER FORMULAS IN BATCH
     LogMessage "Applying marker formulas in batch..."
@@ -910,6 +953,31 @@ ErrorHandler:
     LogMessage "ERROR in PopulateSheetData: " & Err.description & " (Error " & Err.Number & ")"
     PopulateSheetData = False
 End Function
+
+Sub ProcessSubjectCollection(wb As Workbook, wsOutput As Worksheet, subjects As Collection, _
+    ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, _
+    markerFormulaQueue As Collection, headerText As String, categoryName As String)
+    
+    If subjects.count = 0 Then Exit Sub
+    
+    ' Add header if specified
+    If headerText <> "" Then
+        wsOutput.Rows(currentRow).Interior.Color = RGB(0, 0, 0)
+        wsOutput.Cells(currentRow, 2).Value = headerText
+        wsOutput.Cells(currentRow, 2).Font.Color = RGB(255, 255, 255)
+        wsOutput.Cells(currentRow, 2).Font.Bold = True
+        currentRow = currentRow + 1
+    End If
+    
+    ' Process all subjects in collection
+    Dim subject As Variant
+    For Each subject In subjects
+        If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+            LogMessage "ERROR: Failed to process subject in " & categoryName
+        End If
+    Next subject
+End Sub
+
 
 Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, ByRef markerFormulaQueue As Collection) As Boolean
     On Error GoTo ErrorHandler
@@ -936,7 +1004,7 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     Dim assessments As Collection
     Set assessments = GetAssessmentsForSubject(wsAssessment, subjectCode, studyPeriod)
     
-    If assessments Is Nothing Or assessments.Count = 0 Then
+    If assessments Is Nothing Or assessments.count = 0 Then
         ProcessSubject = True
         Exit Function
     End If
@@ -947,13 +1015,13 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     
     ' Calculate structure
     Dim uidCount As Integer
-    uidCount = assessments.Count
+    uidCount = assessments.count
     
     Dim assessmentRows As Integer
     assessmentRows = uidCount + 2
     
     Dim totalRowsNeeded As Integer
-    totalRowsNeeded = Application.WorksheetFunction.Max(assessmentRows, lecturers.Count + 1)
+    totalRowsNeeded = Application.WorksheetFunction.Max(assessmentRows, lecturers.count + 1)
     
     ' Build output array
     Dim outputData() As Variant
@@ -967,7 +1035,7 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     
     ' Assessment rows
     Dim i As Integer
-    For i = 1 To assessments.Count
+    For i = 1 To assessments.count
         Dim assessment As Variant
         assessment = assessments(i)
         
@@ -1004,7 +1072,7 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     
     ' Add assessment formulas
     Dim formulaRow As Long
-    For i = 1 To assessments.Count
+    For i = 1 To assessments.count
         formulaRow = currentRow + i
         Dim assessmentItem As Variant
         assessmentItem = assessments(i)
@@ -1038,7 +1106,7 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     End If
     
     ' Populate lecturer data
-    If lecturers.Count > 0 Then
+    If lecturers.count > 0 Then
         Call PopulateLecturerData(wsOutput, lecturers, subjectStartRow + 1, totalRowIndex, markingSupportBench)
     End If
     
@@ -1253,7 +1321,7 @@ Function GetAssessmentsForSubject(wsAssessment As Worksheet, subjectCode As Stri
     
     If Not cacheInitialized Or cacheSheetName <> wsAssessment.name Then
         Dim lastRow As Long
-        lastRow = wsAssessment.Cells(wsAssessment.Rows.Count, "A").End(xlUp).Row
+        lastRow = wsAssessment.Cells(wsAssessment.Rows.count, "A").End(xlUp).Row
         
         If lastRow < 2 Then
             LogMessage "WARNING: No assessment data found"
@@ -1341,7 +1409,7 @@ Function GetLecturersForSubjectFlexible(wb As Workbook, subjectCode As String, s
     
     If Not cacheInitialized Or cacheSheetName <> wsTeaching.name Then
         Dim lastRow As Long
-        lastRow = wsTeaching.Cells(wsTeaching.Rows.Count, "B").End(xlUp).Row
+        lastRow = wsTeaching.Cells(wsTeaching.Rows.count, "B").End(xlUp).Row
         
         If lastRow < 2 Then
             LogMessage "WARNING: No teaching data found"
@@ -1419,7 +1487,7 @@ Function GetLecturersForSubjectFlexible(wb As Workbook, subjectCode As String, s
             End If
         Next i
         
-        If lecturers.Count > 0 Then Exit For
+        If lecturers.count > 0 Then Exit For
     Next variation
     
     Set GetLecturersForSubjectFlexible = lecturers
@@ -1433,16 +1501,16 @@ End Function
 Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRow As Long, totalRow As Long, markingSupportBench As Double)
     On Error GoTo ErrorHandler
     
-    If lecturers Is Nothing Or lecturers.Count = 0 Then Exit Sub
+    If lecturers Is Nothing Or lecturers.count = 0 Then Exit Sub
     
     ' Build lecturer data array (Columns L-O: Name, Status, Streams, Activity ID)
     Dim lecturerData As Variant
-    ReDim lecturerData(1 To lecturers.Count, 1 To 4)
+    ReDim lecturerData(1 To lecturers.count, 1 To 4)
     
     Dim i As Integer
     Dim lecItem As Variant
     
-    For i = 1 To lecturers.Count
+    For i = 1 To lecturers.count
         lecItem = lecturers(i)
         lecturerData(i, 1) = SafeArrayIndex(lecItem, 0, "")  ' Name
         lecturerData(i, 2) = SafeArrayIndex(lecItem, 1, "")  ' Status
@@ -1451,19 +1519,19 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
     Next i
     
     ' Write lecturer data (Columns L-O: 12-15)
-    wsOutput.Cells(startRow, 12).Resize(lecturers.Count, 4).Value = lecturerData
+    wsOutput.Cells(startRow, 12).Resize(lecturers.count, 4).Value = lecturerData
     
     ' Bold first lecturer (subject coordinator)
-    If lecturers.Count > 0 Then
+    If lecturers.count > 0 Then
         wsOutput.Cells(startRow, 12).Font.Bold = True
     End If
     
     ' BUILD FORMULA ARRAYS for columns Q and R (shifted from P and Q)
     Dim formulas() As Variant
-    ReDim formulas(1 To lecturers.Count, 1 To 2)
+    ReDim formulas(1 To lecturers.count, 1 To 2)
     
     Dim currentRow As Long
-    For i = 1 To lecturers.Count
+    For i = 1 To lecturers.count
         currentRow = startRow + i - 1
         
         ' Column Q (17): Allocated Marking formula
@@ -1476,7 +1544,7 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
     Next i
     
     ' BATCH WRITE both formulas at once (columns Q and R, shifted from 16-17 to 17-18)
-    wsOutput.Cells(startRow, 17).Resize(lecturers.Count, 2).Formula = formulas
+    wsOutput.Cells(startRow, 17).Resize(lecturers.count, 2).Formula = formulas
     
     Exit Sub
     
@@ -1577,7 +1645,7 @@ Function FindColumn(ws As Worksheet, headerName As String) As Integer
     End If
     
     Dim lastCol As Integer
-    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    lastCol = ws.Cells(1, ws.Columns.count).End(xlToLeft).Column
     
     If lastCol < 1 Then
         LogMessage "ERROR: No headers found in FindColumn"
@@ -1606,7 +1674,7 @@ Function FindEnrolmentCell(wsOutput As Worksheet, subjectCode As String, studyPe
     On Error GoTo ErrorHandler
     
     Dim lastRow As Long
-    lastRow = wsOutput.Cells(wsOutput.Rows.Count, "A").End(xlUp).Row
+    lastRow = wsOutput.Cells(wsOutput.Rows.count, "A").End(xlUp).Row
     
     Dim targetUID As String
     targetUID = subjectCode & "_" & studyPeriod & "_0"
@@ -1647,10 +1715,10 @@ Sub FormatSheet(ws As Worksheet)
     On Error GoTo ErrorHandler
     
     ' =================================================================
-    ' COLUMN WIDTHS
+    ' COLUMN WIDTHS (excluding marker blocks)
     ' =================================================================
     Dim widths As Variant
-    widths = Array("A:A", 25, "B:C", 15, "D:D", 11.5, "E:E", 60, "F:H", 7, "I:J", 10.5, "K:L", 30, "M:M", 11.75, "N:N", 6.5, "O:O", 25, "P:Q", 14, "R:S", 30, "T:T", 60, "U:W", 7, "X:Y", 13, "Z:AA", 30, "AB:AB", 10, "AC:AC", 30, "AD:AD", 60, "AE:AG", 7, "AH:AI", 13, "AJ:AK", 30, "AL:AL", 10, "AM:AM", 30, "AN:AN", 60, "AO:AQ", 7, "AR:AS", 13, "AT:AU", 30, "AV:AV", 10)
+    widths = Array("A:A", 25, "B:C", 15, "D:D", 11.5, "E:E", 60, "F:H", 7, "I:J", 10.5, "K:L", 30, "M:M", 11.75, "N:N", 6.5, "O:O", 25, "P:R", 13, "S:S", 30)
     
     Dim i As Long
     For i = LBound(widths) To UBound(widths) Step 2
@@ -1658,30 +1726,30 @@ Sub FormatSheet(ws As Worksheet)
     Next i
     
     ' =================================================================
-    ' NUMBER FORMATS
+    ' NUMBER FORMATS (excluding marker blocks)
     ' =================================================================
     Dim numFormats As Variant
-    numFormats = Array("D:D", "0", "F:I", "0", "J:J", "0.00", "N:N", "0", "P:P", "0", "Q:Q", "0.00", "U:X", "0", "Y:Y", "0.00", "AE:AH", "0", "AI:AI", "0.00", "AO:AR", "0", "AS:AS", "0.00")
+    numFormats = Array("D:D", "0", "F:I", "0", "J:J", "0.00", "N:N", "0", "P:P", "0", "Q:R", "0.00")
     
     For i = LBound(numFormats) To UBound(numFormats) Step 2
         ws.Columns(numFormats(i)).NumberFormat = numFormats(i + 1)
     Next i
     
     ' =================================================================
-    ' HORIZONTAL ALIGNMENT
+    ' HORIZONTAL ALIGNMENT (excluding marker blocks)
     ' =================================================================
     Dim centerCols As Variant
-    centerCols = Array("D:D", "F:J", "N:N", "P:Q", "U:Y", "AB:AB", "AE:AI", "AL:AL", "AO:AS", "AV:AV")
+    centerCols = Array("D:D", "F:J", "N:N", "P:R")
     
     For i = LBound(centerCols) To UBound(centerCols)
         ws.Columns(centerCols(i)).HorizontalAlignment = xlCenter
     Next i
     
     ' =================================================================
-    ' WRAP TEXT
+    ' WRAP TEXT (excluding marker blocks)
     ' =================================================================
     Dim wrapCols As Variant
-    wrapCols = Array("E:E", "R:R", "T:T", "AA:AB", "AD:AD", "AJ:AL", "AN:AN", "AT:AV")
+    wrapCols = Array("E:E", "S:S")
     
     For i = LBound(wrapCols) To UBound(wrapCols)
         ws.Columns(wrapCols(i)).WrapText = True
@@ -1690,7 +1758,12 @@ Sub FormatSheet(ws As Worksheet)
     ' =================================================================
     ' HIDDEN COLUMNS
     ' =================================================================
-    ws.Columns("A:A").Hidden = True
+    Dim hideCols As Variant
+    hideCols = Array("A:A", "N:N")
+    
+    For i = LBound(hideCols) To UBound(hideCols)
+        ws.Columns(hideCols(i)).Hidden = True
+    Next i
     
     ' =================================================================
     ' LOCKED COLUMNS
@@ -1698,7 +1771,7 @@ Sub FormatSheet(ws As Worksheet)
     ws.Cells.Locked = False
     
     Dim lockedCols As Variant
-    lockedCols = Array("B:C", "E:E", "F:H", "J:J", "Q:Q")
+    lockedCols = Array("A:J", "Q:R")
     
     For i = LBound(lockedCols) To UBound(lockedCols)
         ws.Columns(lockedCols(i)).Locked = True
@@ -1713,7 +1786,7 @@ Sub FormatSheet(ws As Worksheet)
     ' CONDITIONAL FORMATTING (Continuing T&R)
     ' =================================================================
     Dim lastRow As Long
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    lastRow = ws.Cells(ws.Rows.count, "A").End(xlUp).Row
     
     If lastRow > 3 Then
         Dim rng As Range
@@ -1738,10 +1811,10 @@ Sub FormatSheet(ws As Worksheet)
     Dim centerOffsets As Variant
     Dim wrapOffsets As Variant
     
-    markerBaseCol = Array(20, 30, 40)
-    markerWidths = Array(60, 7, 7, 7, 13, 13, 30, 30, 10)
-    centerOffsets = Array(1, 2, 3, 4, 5, 8)
-    wrapOffsets = Array(0, 6, 7)
+    markerBaseCol = Array(20, 30, 40)  ' T, AD, AN
+    markerWidths = Array(30, 60, 7, 7, 7, 13, 13, 30, 30, 10)
+    centerOffsets = Array(2, 3, 4, 5, 6, 9)
+    wrapOffsets = Array(1, 7, 8)
     
     Dim m As Integer, baseCol As Integer, offset As Integer
     
@@ -1753,9 +1826,9 @@ Sub FormatSheet(ws As Worksheet)
             ws.Columns(baseCol + offset).ColumnWidth = markerWidths(offset)
         Next offset
         
-        ' Number formats (cols 1-5, with col 5 being decimal)
-        For offset = 1 To 5
-            ws.Columns(baseCol + offset).NumberFormat = IIf(offset = 5, "0.00", "0")
+        ' Number formats (cols 2-6: cols 2-5 are "0", col 6 is "0.00")
+        For offset = 2 To 6
+            ws.Columns(baseCol + offset).NumberFormat = IIf(offset = 6, "0.00", "0")
         Next offset
         
         ' Center alignment
@@ -1768,7 +1841,6 @@ Sub FormatSheet(ws As Worksheet)
             ws.Columns(baseCol + wrapOffsets(offset)).WrapText = True
         Next offset
     Next m
-
     
     ' =================================================================
     ' SHEET PROTECTION
@@ -1805,7 +1877,7 @@ Function HasErrorsInLog() As Boolean
     If wsLog Is Nothing Then Exit Function
     
     Dim lastRow As Long
-    lastRow = wsLog.Cells(wsLog.Rows.Count, 2).End(xlUp).Row
+    lastRow = wsLog.Cells(wsLog.Rows.count, 2).End(xlUp).Row
     
     If lastRow < 2 Then Exit Function
     
@@ -1851,4 +1923,127 @@ Sub CleanupPartialSheets(wb As Workbook)
     Application.DisplayAlerts = True
     
     On Error GoTo 0
+End Sub
+
+Function CopyVBAModuleIfExists(sourceWB As Workbook, targetWB As Workbook, moduleName As String) As Boolean
+    On Error GoTo ErrorHandler
+    
+    CopyVBAModuleIfExists = False
+    LogMessage "=== CopyVBAModuleIfExists START ==="
+    
+    ' Check if module exists in source
+    Dim sourceModule As Object
+    Set sourceModule = Nothing
+    On Error Resume Next
+    Set sourceModule = sourceWB.VBProject.VBComponents(moduleName)
+    On Error GoTo ErrorHandler
+    
+    If sourceModule Is Nothing Then
+        LogMessage "Module '" & moduleName & "' not found in source workbook"
+        Exit Function
+    End If
+    
+    LogMessage "Found module: " & moduleName
+    
+    ' Remove from target if exists
+    On Error Resume Next
+    targetWB.VBProject.VBComponents.Remove targetWB.VBProject.VBComponents(moduleName)
+    Err.Clear
+    On Error GoTo ErrorHandler
+    
+    ' Create new standard module in target
+    Dim targetModule As Object
+    Set targetModule = targetWB.VBProject.VBComponents.add(1) ' 1 = vbext_ct_StdModule
+    targetModule.name = moduleName
+    
+    ' Copy code line by line (NO TEMP FILES - THE KEY FIX!)
+    Dim lineCount As Long
+    lineCount = sourceModule.CodeModule.CountOfLines
+    
+    If lineCount > 0 Then
+        Dim allCode As String
+        allCode = sourceModule.CodeModule.lines(1, lineCount)
+        
+        ' ? FIXED: Use AddFromString instead of InsertLines
+        targetModule.CodeModule.AddFromString allCode
+        LogMessage "Copied " & lineCount & " lines"
+    End If
+    
+    LogMessage "=== CopyVBAModuleIfExists SUCCESS ==="
+    CopyVBAModuleIfExists = True
+    Exit Function
+    
+ErrorHandler:
+    LogMessage "ERROR in CopyVBAModuleIfExists: " & Err.Number & " - " & Err.description
+    CopyVBAModuleIfExists = False
+End Function
+
+' ============================================================================
+' ADD REFRESH BUTTONS - Simple version
+' Just adds button at L2 on each calculation sheet
+' ============================================================================
+
+Sub AddRefreshButtonsToSheets(wb As Workbook)
+    On Error GoTo ErrorHandler
+    
+    LogMessage "Adding refresh buttons to sheets..."
+    
+    Dim ws As Worksheet
+    Dim btn As Button
+    
+    ' Add button to FHY Calculations sheet
+    On Error Resume Next
+    Set ws = wb.Sheets("FHY Calculations")
+    On Error GoTo ErrorHandler
+    
+    If Not ws Is Nothing Then
+        ' Delete existing button if present
+        On Error Resume Next
+        ws.Buttons.Delete
+        Err.Clear
+        On Error GoTo ErrorHandler
+        
+        ' Add new button at L2
+        Set btn = ws.Buttons.add(ws.Range("L2").Left, ws.Range("L2").Top, _
+                                  ws.Range("L2").Width, ws.Range("L2").Height)
+        
+        With btn
+            .OnAction = "RefreshLecturerData"
+            .Caption = "Refresh Lecturer Data"
+            .name = "RefreshButton"
+        End With
+        
+        LogMessage "Added refresh button to FHY Calculations at L2"
+    End If
+    
+    ' Add button to SHY Calculations sheet
+    Set ws = Nothing
+    On Error Resume Next
+    Set ws = wb.Sheets("SHY Calculations")
+    On Error GoTo ErrorHandler
+    
+    If Not ws Is Nothing Then
+        ' Delete existing button if present
+        On Error Resume Next
+        ws.Buttons.Delete
+        Err.Clear
+        On Error GoTo ErrorHandler
+        
+        ' Add new button at L2
+        Set btn = ws.Buttons.add(ws.Range("L2").Left, ws.Range("L2").Top, _
+                                  ws.Range("L2").Width, ws.Range("L2").Height)
+        
+        With btn
+            .OnAction = "RefreshLecturerData"
+            .Caption = "Refresh Lecturer Data"
+            .name = "RefreshButton"
+        End With
+        
+        LogMessage "Added refresh button to SHY Calculations at L2"
+    End If
+    
+    Exit Sub
+    
+ErrorHandler:
+    LogMessage "ERROR in AddRefreshButtonsToSheets: " & Err.description
 End Sub
