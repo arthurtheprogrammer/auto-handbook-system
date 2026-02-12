@@ -1,0 +1,196 @@
+function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lecturerStatusJson: object) {
+  // Define interfaces for type safety
+  interface AssignmentEntry {
+    "Subject Code DO NOT SORT"?: string;
+    "Study Period"?: string;
+    "Lecturer DO NOT SORT"?: string;
+    "Activity ID"?: string;
+  }
+
+  interface StatusEntry {
+    Name?: string;
+    Status?: string;
+  }
+
+  try {
+    // Use JSON inputs directly as objects (no parsing needed)
+    const assignments: AssignmentEntry[] = lecturerStreamJson as AssignmentEntry[];
+    const statusesArray: StatusEntry[] = lecturerStatusJson as StatusEntry[];
+
+    // Build lecturer status dictionary
+    const statusMap = new Map<string, string>();
+    statusesArray.forEach((item: StatusEntry) => {
+      if (item.Name && item.Name.trim()) {
+        statusMap.set(item.Name.trim(), item.Status ? item.Status.trim() : "");
+      }
+    });
+
+    // Data aggregation map: key → {subjectCode, studyPeriod, lecturer, activityIds: Set}
+    const dataMap = new Map<string, {
+      subjectCode: string,
+      studyPeriod: string,
+      lecturer: string,
+      activityIds: Set<string>
+    }>();
+
+    // Process each assignment entry
+    assignments.forEach((entry: AssignmentEntry) => {
+      const subjectCode: string = entry["Subject Code DO NOT SORT"] || "";
+      const studyPeriod: string = entry["Study Period"] || "";
+      const lecturer: string = (entry["Lecturer DO NOT SORT"] || "").trim();
+      const activityID: string = entry["Activity ID"] || "";
+
+      // Skip if essential fields are missing
+      if (!subjectCode || !studyPeriod || !lecturer || !activityID) {
+        return;
+      }
+
+      // Create unique key
+      const key: string = `${subjectCode}|${studyPeriod}|${lecturer}`;
+
+      // Extract activity ID suffix using Power Automate logic:
+      // skip first 5 parts after splitting by '_', then join remaining parts
+      // Example: "BUSA30000_U_1_SM1_2025_W01_01" -> skip 5 parts -> "W01_01"
+      const activityIdParts: string[] = activityID.split('_');
+      const suffix: string = activityIdParts.length > 5
+        ? activityIdParts.slice(5).join('_')
+        : activityID;
+
+      // Initialize or update data map entry
+      if (!dataMap.has(key)) {
+        dataMap.set(key, {
+          subjectCode: subjectCode,
+          studyPeriod: studyPeriod,
+          lecturer: lecturer,
+          activityIds: new Set<string>()
+        });
+      }
+      dataMap.get(key)?.activityIds.add(suffix);
+    });
+
+    // Prepare output sheet and table
+    const outputSheetName = "teaching stream";
+    const outputTableName = "teaching_stream";
+
+    let outputSheet = workbook.getWorksheet(outputSheetName);
+
+    if (!outputSheet) {
+      throw new Error(`Worksheet "${outputSheetName}" not found. Please create it first.`);
+    }
+
+    let outputTable = outputSheet.getTable(outputTableName);
+
+    if (!outputTable) {
+      throw new Error(`Table "${outputTableName}" not found in worksheet "${outputSheetName}". Please create it first.`);
+    }
+
+    // Clear existing data from table (keep headers)
+    const rowCount = outputTable.getRowCount();
+    if (rowCount > 0) {
+      // Delete rows one at a time from the end to avoid shifting issues
+      for (let i = rowCount - 1; i >= 0; i--) {
+        outputTable.deleteRowsAt(i, 1);
+      }
+    }
+
+    // Output data rows to table
+    const outputData: (string | number)[][] = [];
+
+    dataMap.forEach((value, key) => {
+      const status: string = statusMap.get(value.lecturer) || "";
+      const activities: string = Array.from(value.activityIds).sort().join("; ");
+      const streamCount: number = value.activityIds.size;
+
+      const outputRow: (string | number)[] = [
+        key,                    // Lecturer Key
+        value.subjectCode,      // Subject Code
+        value.studyPeriod,      // Study Period
+        value.lecturer,         // Lecturer
+        status,                 // Status
+        activities,             // Activity ID
+        streamCount             // Streams
+      ];
+
+      outputData.push(outputRow);
+    });
+
+    // Add rows to table
+    if (outputData.length > 0) {
+      outputTable.addRows(-1, outputData);
+    }
+
+    console.log(`Successfully processed ${dataMap.size} unique lecturer assignments.`);
+
+    // =========================================================================
+    // UPDATE PROGRESS BAR TABLE IN DASHBOARD
+    // =========================================================================
+    try {
+      const dashboardWs = workbook.getWorksheet("Dashboard");
+      if (dashboardWs) {
+        const progressTable = dashboardWs.getTable("progress_bar");
+        if (progressTable) {
+          // Get all data from progress_bar table
+          const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
+          if (progressRange) {
+            const progressData = progressRange.getValues();
+
+            // Find column indices
+            const headers = progressTable.getHeaderRowRange().getValues()[0];
+            const progressColIndex = headers.findIndex(h =>
+              String(h).toLowerCase().includes("progress")
+            );
+            const statusColIndex = headers.findIndex(h =>
+              String(h).toLowerCase().includes("status")
+            );
+
+            if (progressColIndex !== -1 && statusColIndex !== -1) {
+              // Find the row where Progress column contains "Teaching Stream"
+              for (let r = 0; r < progressData.length; r++) {
+                const progressValue = String(progressData[r][progressColIndex]).trim();
+                if (progressValue.toLowerCase().includes("teaching stream")) {
+                  // Update Status column to "Done"
+                  const statusCell = progressRange.getCell(r, statusColIndex);
+                  statusCell.setValue("Done");
+
+                  // Optional: Set cell color to green
+                  statusCell.getFormat().getFill().setColor("#92D050"); // Light green
+
+                  console.log(`Updated progress_bar: Teaching Stream -> Done`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (progressError) {
+      const progressErrMsg = progressError instanceof Error ? progressError.message : String(progressError);
+      console.log("Warning: Could not update progress_bar table: " + progressErrMsg);
+      // Don't fail the whole script if progress update fails
+    }
+
+    return {
+      success: true,
+      recordsProcessed: dataMap.size,
+      message: `Data parsed and written to table "${outputTableName}" in worksheet "${outputSheetName}"`
+    };
+
+  } catch (error) {
+    // Improved error handling
+    let errorMessage = "Unknown error occurred";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    } else {
+      errorMessage = JSON.stringify(error);
+    }
+
+    console.log("Error processing data: " + errorMessage);
+    return {
+      success: false,
+      error: errorMessage,
+      message: "Failed to process data"
+    };
+  }
+}

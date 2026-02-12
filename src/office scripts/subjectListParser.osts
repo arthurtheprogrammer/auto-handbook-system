@@ -1,0 +1,249 @@
+function main(workbook: ExcelScript.Workbook, subjectData: object[], year: number, iterationDate: string) {
+  // Define interface for type safety - using index signature for dynamic keys
+  interface SubjectRecord {
+    [key: string]: string | undefined;
+  }
+
+  try {
+    console.log(`Script started. Received ${subjectData?.length || 0} subjects, year: ${year}, iteration: ${iterationDate}`);
+
+    // Cast input to proper type
+    const subjects: SubjectRecord[] = subjectData as SubjectRecord[];
+
+    // Get the SubjectList worksheet
+    const ws = workbook.getWorksheet("SubjectList");
+    if (!ws) {
+      throw new Error("Worksheet 'SubjectList' not found.");
+    }
+    console.log("Worksheet 'SubjectList' found.");
+
+    // Get table by name
+    const table = ws.getTable("subject_list");
+    if (!table) {
+      throw new Error("Table 'subject_list' not found in worksheet 'SubjectList'.");
+    }
+    console.log("Table 'subject_list' found.");
+
+    // Helper function to find JSON property by keyword
+    const findJsonProperty = (obj: SubjectRecord, keyword: string): string => {
+      for (const key in obj) {
+        if (key.toLowerCase().includes(keyword.toLowerCase())) {
+          return obj[key] || "";
+        }
+      }
+      return "";
+    };
+
+    // Build output rows
+    console.log("Building output rows...");
+    const outputRows: (string | number | boolean)[][] = [];
+
+    subjects.forEach((item, i) => {
+      // Extract values by searching for keywords in JSON property names
+      const subjectCode: string = findJsonProperty(item, "Subject Code").trim();
+      const subjectName: string = findJsonProperty(item, "Subject Name").trim();
+      const coordinator: string = findJsonProperty(item, "Subject Coordinator").trim();
+      const groupPeriod: string = findJsonProperty(item, "Grouped Period").trim();
+      const studyPeriod: string = findJsonProperty(item, "Study Period").trim();
+      const deliveryMode: string = findJsonProperty(item, "Delivery Mode").trim();
+      const statusRaw: string = findJsonProperty(item, "Status").trim();
+
+      // Check if status contains "Active" (case-insensitive)
+      const status: string = statusRaw.toLowerCase().includes("active") ? "Active" : statusRaw || "Active";
+
+      // Generate UID with padded index (001, 002, 003, etc.)
+      const paddedIndex: string = (i + 1).toString().padStart(3, '0');
+      const uid: string = `${iterationDate}_${paddedIndex}`;
+
+      // Generate handbook URL
+      const handbookURL: string = `https://handbook.unimelb.edu.au/${year}/subjects/${subjectCode.toLowerCase()}/assessment`;
+
+      // Apply exclude rules
+      let isExcluded: boolean = false;
+
+      // Rule 1: Exclude if subject code contains FNCE
+      if (subjectCode.toUpperCase().includes("FNCE")) {
+        isExcluded = true;
+      }
+
+      // Rule 2: Exclude if subject name contains "indigenous" or "indigenising"
+      if (subjectName.toLowerCase().includes("indigenous") ||
+        subjectName.toLowerCase().includes("indigenising")) {
+        isExcluded = true;
+      }
+
+      // Rule 3: Exclude if last 5 characters of subject code are NOT a valid number
+      if (subjectCode.length >= 5) {
+        const last5Chars = subjectCode.slice(-5);
+        const parsed = parseInt(last5Chars, 10);
+        if (isNaN(parsed)) {
+          isExcluded = true;
+        }
+      }
+
+      // Rule 4: Exclude if delivery mode contains "online" or "offshore" (case-insensitive)
+      const deliveryModeLower = deliveryMode.toLowerCase();
+      if (deliveryModeLower.includes("online") || deliveryModeLower.includes("offshore")) {
+        isExcluded = true;
+      }
+
+      // Create row in table column order (including Exclude column J)
+      const row: (string | number | boolean)[] = [
+        uid,              // UID (sorter)
+        subjectCode,      // Subject Code
+        subjectName,      // Subject Name
+        coordinator,      // Subject Coordinator
+        deliveryMode,     // Delivery Mode
+        groupPeriod,      // Grouped Period
+        studyPeriod,      // Study Period
+        status,           // Status
+        handbookURL,      // Handbook Link
+        isExcluded        // Exclude (checkbox)
+      ];
+
+      outputRows.push(row);
+    });
+
+    console.log(`Built ${outputRows.length} output rows.`);
+
+    // === NEW APPROACH: Use table.resize() to match data size ===
+    const currentRowCount = table.getRowCount();
+    console.log(`Current row count: ${currentRowCount}, Target: ${outputRows.length}`);
+
+    // Get current table range
+    const currentRange = table.getRange();
+    const tableAddress = currentRange.getAddress();
+    console.log(`Current table range: ${tableAddress}`);
+
+    // Calculate new range based on data
+    const headerRowRange = table.getHeaderRowRange();
+    const startAddress = headerRowRange.getAddress().split(':')[0]; // e.g., "A1"
+
+    // Parse start address to get column and row
+    const startMatch = startAddress.match(/([A-Z]+)(\d+)/);
+    if (!startMatch) {
+      throw new Error("Could not parse table start address");
+    }
+
+    const startCol = startMatch[1]; // e.g., "A"
+    const startRow = parseInt(startMatch[2]); // e.g., 1
+
+    // Get last column from table (assumes 10 columns: A through J)
+    const columnCount = table.getColumns().length;
+    const endCol = String.fromCharCode(startCol.charCodeAt(0) + columnCount - 1);
+
+    // Calculate end row (header row + data rows)
+    const endRow = startRow + outputRows.length; // Header + all data rows
+
+    // Build new range address
+    const newRangeAddress = `${startCol}${startRow}:${endCol}${endRow}`;
+    console.log(`Resizing table to: ${newRangeAddress}`);
+
+    // Resize the table to match the data
+    const newRange = ws.getRange(newRangeAddress);
+    table.resize(newRange);
+    console.log(`Table resized successfully to ${outputRows.length} rows.`);
+
+    // Now write all data
+    console.log(`Writing ${outputRows.length} rows to table...`);
+    const dataRange = table.getRangeBetweenHeaderAndTotal();
+    dataRange.setValues(outputRows);
+    console.log(`Successfully wrote all data to table.`);
+
+    // Set hyperlinks for Handbook Link column (column index 8, 0-indexed)
+    try {
+      console.log("Setting hyperlinks...");
+      const linkValues = dataRange.getValues();
+
+      for (let r = 0; r < linkValues.length; r++) {
+        const cell = dataRange.getCell(r, 8); // Handbook Link is column 8 (0-indexed)
+        const url = linkValues[r][8] as string;
+        if (url) {
+          cell.setHyperlink({ textToDisplay: url, address: url });
+        }
+      }
+      console.log(`Set hyperlinks for ${linkValues.length} rows.`);
+    } catch (linkError) {
+      const linkErrMsg = linkError instanceof Error ? linkError.message : JSON.stringify(linkError);
+      console.log(`Warning: Error setting hyperlinks: ${linkErrMsg}`);
+      // Don't throw - hyperlinks are not critical
+    }
+
+    console.log(`Successfully processed ${subjects.length} subject records.`);
+
+    // =========================================================================
+    // UPDATE PROGRESS BAR TABLE IN DASHBOARD
+    // =========================================================================
+    try {
+      const dashboardWs = workbook.getWorksheet("Dashboard");
+      if (dashboardWs) {
+        const progressTable = dashboardWs.getTable("progress_bar");
+        if (progressTable) {
+          const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
+          if (progressRange) {
+            const progressData = progressRange.getValues();
+
+            const headers = progressTable.getHeaderRowRange().getValues()[0];
+            const progressColIndex = headers.findIndex(h =>
+              String(h).toLowerCase().includes("progress")
+            );
+            const statusColIndex = headers.findIndex(h =>
+              String(h).toLowerCase().includes("status")
+            );
+
+            if (progressColIndex !== -1 && statusColIndex !== -1) {
+              for (let r = 0; r < progressData.length; r++) {
+                const progressValue = String(progressData[r][progressColIndex]).trim();
+                if (progressValue.toLowerCase().includes("subject list")) {
+                  const statusCell = progressRange.getCell(r, statusColIndex);
+                  statusCell.setValue("Done");
+                  statusCell.getFormat().getFill().setColor("#92D050");
+                  console.log(`Updated progress_bar: Subject List -> Done`);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (progressError) {
+      const progressErrMsg = progressError instanceof Error ? progressError.message : JSON.stringify(progressError);
+      console.log("Warning: Could not update progress_bar table: " + progressErrMsg);
+    }
+
+    return {
+      success: true,
+      recordsProcessed: subjects.length,
+      message: `Data written to table 'subject_list' in worksheet 'SubjectList'`
+    };
+
+  } catch (error) {
+    let errorMessage = "Unknown error occurred";
+    let errorDetails = "";
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || "";
+    } else if (typeof error === "object" && error !== null) {
+      try {
+        errorMessage = JSON.stringify(error);
+      } catch {
+        errorMessage = String(error);
+      }
+    } else {
+      errorMessage = String(error);
+    }
+
+    console.log("=== ERROR PROCESSING DATA ===");
+    console.log("Error message: " + errorMessage);
+    if (errorDetails) {
+      console.log("Error details: " + errorDetails);
+    }
+
+    return {
+      success: false,
+      error: errorMessage,
+      message: "Failed to process subject data"
+    };
+  }
+}
