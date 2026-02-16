@@ -329,7 +329,8 @@ These three settings need to be configured **once per computer** before first us
 3. If prompted about data connections, click **Enable**
 4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
 
-**💡 Tip**: If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
+> [!TIP]
+> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
 
 </details>
 
