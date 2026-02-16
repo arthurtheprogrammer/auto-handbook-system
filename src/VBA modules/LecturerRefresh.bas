@@ -613,6 +613,8 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
                 End If
             Next k
             
+            Call ApplyLecturerFormulas(ws, headerRow, totalRow)
+            
             UpdateAllLecturers = UpdateAllLecturers + 1
         End If
         
@@ -622,6 +624,49 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
     
     On Error GoTo 0
 End Function
+
+'------------------------------------------------------------------------------
+' APPLY LECTURER FORMULAS
+' Applies formulas to columns Q & R for all lecturer rows
+'------------------------------------------------------------------------------
+Private Sub ApplyLecturerFormulas(ws As Worksheet, headerRow As Long, totalRow As Long)
+    On Error Resume Next
+    
+    Dim firstLecturerRow As Long
+    Dim lastLecturerRow As Long
+    Dim numLecturers As Long
+    
+    firstLecturerRow = headerRow + 1
+    lastLecturerRow = totalRow - 1
+    numLecturers = lastLecturerRow - firstLecturerRow + 1
+    
+    If numLecturers <= 0 Then Exit Sub
+    
+    ' Build formula arrays for batch write (faster than row-by-row)
+    Dim formulas As Variant
+    ReDim formulas(1 To numLecturers, 1 To 2)
+    
+    Dim currentRow As Long
+    Dim i As Long
+    
+    i = 1
+    For currentRow = firstLecturerRow To lastLecturerRow
+        ' Column Q (17): Allocated Marking
+        ' =IF(M[row]="Continuing T&R",N[row]*VALUE(LEFT($Q$2,FIND(" ",$Q$2)-1)),"")
+        formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
+        
+        ' Column R (18): Marking Support Hours Available
+        ' =IF(Q[row]="","",$J$[totalRow]*(P[row]/D[headerRow])-Q[row])
+        formulas(i, 2) = "=IF(Q" & currentRow & "="""","""",$J$" & totalRow & "*(P" & currentRow & "/D" & headerRow & ")-Q" & currentRow & ")"
+        
+        i = i + 1
+    Next currentRow
+    
+    ' Batch write both formulas at once (columns Q & R = 17-18)
+    ws.Cells(firstLecturerRow, 17).Resize(numLecturers, 2).Formula = formulas
+    
+    On Error GoTo 0
+End Sub
 
 '=============================================================================
 ' HELPER FUNCTIONS
