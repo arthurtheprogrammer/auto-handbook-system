@@ -156,9 +156,9 @@ Other columns (FTE, workload, email, scheduling, etc.) are **not read**.
 
 ---
 
-### Output Tables (What the System Writes)
+### Working Tables (Individual deliverables to track each process)
 
-These tables are populated automatically — you generally don't need to edit them.
+These tables are populated automatically to build towards the final output spreadsheet. You generally don't need to edit them.
 
 #### `SubjectList` Sheet → `subject_list` Table
 
@@ -240,7 +240,7 @@ These tables are populated automatically — you generally don't need to edit th
 
 ---
 
-## Understanding the Output
+## Understanding the Output (`Marking & Admin Support Calculations` spreadsheet)
 
 The system produces a file like: `[YEAR] Marking Admin Support Calculations.xlsm`
 
