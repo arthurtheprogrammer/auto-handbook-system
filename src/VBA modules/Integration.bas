@@ -8,12 +8,13 @@
 '------------------------------------------------------------------------------
 Public StopMonitoring As Boolean
 Public OriginalCalculationMode As XlCalculation
+Public SilentMode As Boolean
 
 '------------------------------------------------------------------------------
-' MAIN ENTRY POINT - TriggerPowerAutomate
+' MAIN ENTRY POINT - GenerateMarkingSupport
 ' Triggers workflows, monitors for completion, then runs all macros
 '------------------------------------------------------------------------------
-Sub TriggerPowerAutomate()
+Sub GenerateMarkingSupport()
     Dim ws As Worksheet
     Dim yearValue As String
     Dim yearNum As Long
@@ -21,6 +22,9 @@ Sub TriggerPowerAutomate()
     Dim teachingMatrix As String
     Dim emailValue As String
     Dim startDateTime As Date
+    
+    ' Enable silent mode to suppress MsgBox in sub-modules
+    SilentMode = True
     
     ' Always keep screen updating ON
     Application.ScreenUpdating = True
@@ -46,7 +50,7 @@ Sub TriggerPowerAutomate()
     
     ws.Calculate
     DoEvents
-    
+
     ClearStatusColumn ws
     
     ' Validate year input
@@ -55,6 +59,7 @@ Sub TriggerPowerAutomate()
     If Err.Number <> 0 Or IsEmpty(ws.Range("C2").Value) Or yearNum < 2025 Then
         On Error GoTo 0
         MsgBox "Please enter a valid year (2025 or later)!", vbExclamation, "Invalid Year"
+        SilentMode = False
         Application.Calculation = OriginalCalculationMode
         Exit Sub
     End If
@@ -66,66 +71,12 @@ Sub TriggerPowerAutomate()
     teachingMatrix = GetOptionalValue(ws.Range("C5").Value)
     emailValue = GetOptionalValue(ws.Range("C12").Value)
     
-    ' START WORKFLOWS
-    StartWorkflow1 ws, yearValue, enrolmentTracker, emailValue
-    StartWorkflow3 ws, yearValue, teachingMatrix, emailValue
+    ' START WORKFLOWS (calling extracted modules)
+    TriggerSubjectListWorkflow ws, yearValue, enrolmentTracker, emailValue
+    TriggerTeachingStreamWorkflow ws, yearValue, teachingMatrix, emailValue
     
     ' Start monitoring
     MonitorAndExecute ws, emailValue
-End Sub
-
-'------------------------------------------------------------------------------
-' WORKFLOW 1 - Enrolment Tracker Processing
-'------------------------------------------------------------------------------
-Sub StartWorkflow1(ws As Worksheet, yearValue As String, enrolmentTracker As String, emailValue As String)
-    Dim url As String
-    Dim jsonData As String
-    Dim result As String
-    
-    url = "https://default0e5bf3cf1ff446b7917652c538c22a.4d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/98c68237600941c8a349156641a1cc54/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ZuW5DcOAmY9csBoZjhpqTYYo0LjeUS3qxAYpN6S5sKg"
-    
-    With ws.Range("F2")
-        .Value = "Running..."
-        .Interior.Color = RGB(255, 192, 0)
-    End With
-    DoEvents
-    
-    jsonData = "{" & Chr(34) & "year" & Chr(34) & ":" & yearValue & "," & _
-               Chr(34) & "enrolmentTrackerFilename" & Chr(34) & ":" & Chr(34) & EscapeJSON(enrolmentTracker) & Chr(34) & "," & _
-               Chr(34) & "email" & Chr(34) & ":" & Chr(34) & EscapeJSON(emailValue) & Chr(34) & "}"
-    
-    #If Mac Then
-        result = SendRequestMac(url, jsonData)
-    #Else
-        result = SendRequestWindows(url, jsonData)
-    #End If
-End Sub
-
-'------------------------------------------------------------------------------
-' WORKFLOW 3 - Teaching Matrix Processing
-'------------------------------------------------------------------------------
-Sub StartWorkflow3(ws As Worksheet, yearValue As String, teachingMatrix As String, emailValue As String)
-    Dim url As String
-    Dim jsonData As String
-    Dim result As String
-    
-    url = "https://default0e5bf3cf1ff446b7917652c538c22a.4d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7f198e614c734715bc0153d818de1ef7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=5uUuhFHyiL37O_ajy-6t2r65nFqc7NA_oJDhYmYFT9g"
-    
-    With ws.Range("F5")
-        .Value = "Running..."
-        .Interior.Color = RGB(255, 192, 0)
-    End With
-    DoEvents
-    
-    jsonData = "{" & Chr(34) & "year" & Chr(34) & ":" & yearValue & "," & _
-               Chr(34) & "teachingMatrixFilename" & Chr(34) & ":" & Chr(34) & EscapeJSON(teachingMatrix) & Chr(34) & "," & _
-               Chr(34) & "email" & Chr(34) & ":" & Chr(34) & EscapeJSON(emailValue) & Chr(34) & "}"
-    
-    #If Mac Then
-        result = SendRequestMac(url, jsonData)
-    #Else
-        result = SendRequestWindows(url, jsonData)
-    #End If
 End Sub
 
 '------------------------------------------------------------------------------
@@ -136,15 +87,15 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     Dim startTime As Double
     Dim lastRefreshTime As Double
     Dim refreshInterval As Double
-    Dim workflow1Complete As Boolean
-    Dim workflow3Complete As Boolean
+    Dim subjectListComplete As Boolean
+    Dim teachingStreamComplete As Boolean
     
     maxWaitMinutes = 30
     startTime = Timer
     lastRefreshTime = Timer
     refreshInterval = 5
-    workflow1Complete = False
-    workflow3Complete = False
+    subjectListComplete = False
+    teachingStreamComplete = False
     
     Application.StatusBar = "Monitoring workflows..."
     
@@ -155,7 +106,7 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     Do While Not StopMonitoring And Timer - startTime < (maxWaitMinutes * 60)
         DoEvents
         
-        ' Force cloud sync every 3 seconds
+        ' Force cloud sync every 5 seconds
         If Timer - lastRefreshTime > refreshInterval Then
             ForceCloudSync ws
             lastRefreshTime = Timer
@@ -164,24 +115,24 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
         ws.Calculate
         DoEvents
         
-        ' Check Workflow 1 completion (F2)
-        If Not workflow1Complete And CheckWorkflowComplete(ws, "F2") Then
-            workflow1Complete = True
-            Application.StatusBar = "Workflow 1 completed!"
-            Debug.Print "Workflow 1 Done"
+        ' Check Subject List Refresh completion (F2)
+        If Not subjectListComplete And CheckWorkflowComplete(ws, "F2") Then
+            subjectListComplete = True
+            Application.StatusBar = "Subject List Refresh completed!"
+            Debug.Print "Subject List Refresh Done"
             Application.Wait (Now + TimeValue("0:00:01"))
         End If
         
-        ' Check Workflow 3 completion (F5)
-        If Not workflow3Complete And CheckWorkflowComplete(ws, "F5") Then
-            workflow3Complete = True
-            Application.StatusBar = "Workflow 3 completed!"
-            Debug.Print "Workflow 3 Done"
+        ' Check Teaching Stream Refresh completion (F5)
+        If Not teachingStreamComplete And CheckWorkflowComplete(ws, "F5") Then
+            teachingStreamComplete = True
+            Application.StatusBar = "Teaching Stream Refresh completed!"
+            Debug.Print "Teaching Stream Refresh Done"
             Application.Wait (Now + TimeValue("0:00:01"))
         End If
         
         ' If both complete, exit monitoring loop
-        If workflow1Complete And workflow3Complete Then
+        If subjectListComplete And teachingStreamComplete Then
             Application.StatusBar = "Both workflows complete! Running macros..."
             Exit Do
         End If
@@ -190,8 +141,8 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
         If Int(Timer) Mod 10 < 2 Then
             Dim statusMsg As String
             statusMsg = "Monitoring: "
-            If Not workflow1Complete Then statusMsg = statusMsg & "W1 "
-            If Not workflow3Complete Then statusMsg = statusMsg & "W3 "
+            If Not subjectListComplete Then statusMsg = statusMsg & "Subject List "
+            If Not teachingStreamComplete Then statusMsg = statusMsg & "Teaching Stream "
             If statusMsg <> "Monitoring: " Then
                 Application.StatusBar = statusMsg & "in progress..."
             End If
@@ -204,16 +155,16 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     Application.StatusBar = False
     
     ' POST-MONITORING EXECUTION
-    If Not StopMonitoring And workflow1Complete And workflow3Complete Then
+    If Not StopMonitoring And subjectListComplete And teachingStreamComplete Then
         ' Both workflows completed - run all macros
         RunAllMacros ws, emailValue
         FinalizeProcess ws, emailValue
         
         MsgBox "All processes completed!" & vbCrLf & vbCrLf & _
-               "? Workflow 1: Complete" & vbCrLf & _
+               "? Subject List Refresh: Complete" & vbCrLf & _
                "? GenerateSubjectQueries: Complete" & vbCrLf & _
                "? ParseAssessmentData: Complete" & vbCrLf & _
-               "? Workflow 3: Complete" & vbCrLf & _
+               "? Teaching Stream Refresh: Complete" & vbCrLf & _
                "? GenerateCalculationSheets: Complete", vbInformation
         
     ElseIf StopMonitoring Then
@@ -226,6 +177,8 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
         FinalizeProcess ws, emailValue
     End If
     
+    ' Disable silent mode and restore calculation
+    SilentMode = False
     Application.Calculation = OriginalCalculationMode
 End Sub
 
@@ -406,6 +359,7 @@ Sub StopWorkflowMonitoring()
     Application.StatusBar = False
     MsgBox "Monitoring stopped.", vbInformation
     
+    SilentMode = False
     Application.Calculation = OriginalCalculationMode
 End Sub
 
@@ -418,6 +372,7 @@ Sub ResetStatus()
     
     ClearStatusColumn ws
     StopMonitoring = False
+    SilentMode = False
     Application.StatusBar = False
     Application.Calculation = OriginalCalculationMode
     

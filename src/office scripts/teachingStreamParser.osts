@@ -1,16 +1,24 @@
 function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lecturerStatusJson: object) {
-  // Define interfaces for type safety
+  // Define interface with index signature for flexible key matching
   interface AssignmentEntry {
-    "Subject Code DO NOT SORT"?: string;
-    "Study Period"?: string;
-    "Lecturer DO NOT SORT"?: string;
-    "Activity ID"?: string;
+    [key: string]: string | undefined;
   }
 
   interface StatusEntry {
-    Name?: string;
-    Status?: string;
+    [key: string]: string | undefined;
   }
+
+  // Helper function to find JSON property by keyword (handles line breaks and whitespace in headers)
+  const findJsonProperty = (obj: { [key: string]: string | undefined }, keyword: string): string => {
+    const normalizedKeyword = keyword.toLowerCase().replace(/\s+/g, ' ').trim();
+    for (const key in obj) {
+      const normalizedKey = key.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (normalizedKey.includes(normalizedKeyword)) {
+        return obj[key] || "";
+      }
+    }
+    return "";
+  };
 
   try {
     // Use JSON inputs directly as objects (no parsing needed)
@@ -20,8 +28,12 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     // Build lecturer status dictionary
     const statusMap = new Map<string, string>();
     statusesArray.forEach((item: StatusEntry) => {
-      if (item.Name && item.Name.trim()) {
-        statusMap.set(item.Name.trim(), item.Status ? item.Status.trim() : "");
+      // Staff sheet: match "Title Given Name Family Name" column for the display name
+      // and "Status DO NOT SORT" column for employment status
+      const name = findJsonProperty(item, "Title Given Name");
+      const status = findJsonProperty(item, "Status");
+      if (name.trim()) {
+        statusMap.set(name.trim(), status.trim());
       }
     });
 
@@ -35,10 +47,10 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
 
     // Process each assignment entry
     assignments.forEach((entry: AssignmentEntry) => {
-      const subjectCode: string = entry["Subject Code DO NOT SORT"] || "";
-      const studyPeriod: string = entry["Study Period"] || "";
-      const lecturer: string = (entry["Lecturer DO NOT SORT"] || "").trim();
-      const activityID: string = entry["Activity ID"] || "";
+      const subjectCode: string = findJsonProperty(entry, "Subject Code").trim();
+      const studyPeriod: string = findJsonProperty(entry, "Study Period").trim();
+      const lecturer: string = findJsonProperty(entry, "Lecturer").trim();
+      const activityID: string = findJsonProperty(entry, "Activity ID").trim();
 
       // Skip if essential fields are missing
       if (!subjectCode || !studyPeriod || !lecturer || !activityID) {

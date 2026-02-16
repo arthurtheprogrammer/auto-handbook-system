@@ -27,7 +27,7 @@ Sub InitializeProcessLog(wb As Workbook)
         Set existingLog = Nothing
         Set existingLog = wb.Sheets("Process Log")
         If Not existingLog Is Nothing Then
-            MsgBox "CRITICAL: Could not delete existing Process Log. It may be protected or in use.", vbCritical
+            If Not SilentMode Then MsgBox "CRITICAL: Could not delete existing Process Log. It may be protected or in use.", vbCritical
             End
         End If
     End If
@@ -47,12 +47,12 @@ Sub InitializeProcessLog(wb As Workbook)
         
         tempLog.name = "ProcessLog_" & Format(Now, "hhmmss")
         If Err.Number <> 0 Then
-            MsgBox "CRITICAL: Could not name log sheet (Error " & errNum & "). Process aborted.", vbCritical
+            If Not SilentMode Then MsgBox "CRITICAL: Could not name log sheet (Error " & errNum & "). Process aborted.", vbCritical
             tempLog.Delete
             Application.ScreenUpdating = True
             End
         Else
-            MsgBox "Log sheet created with alternative name: " & tempLog.name, vbInformation
+            If Not SilentMode Then MsgBox "Log sheet created with alternative name: " & tempLog.name, vbInformation
         End If
     End If
     
@@ -61,7 +61,7 @@ Sub InitializeProcessLog(wb As Workbook)
     Set wsLog = Nothing
     Set wsLog = wb.Sheets(tempLog.name)
     If wsLog Is Nothing Then
-        MsgBox "CRITICAL: Failed to verify log sheet creation.", vbCritical
+        If Not SilentMode Then MsgBox "CRITICAL: Failed to verify log sheet creation.", vbCritical
         Application.ScreenUpdating = True
         End
     End If
@@ -83,7 +83,7 @@ Sub InitializeProcessLog(wb As Workbook)
     
 ErrorHandler:
     Application.ScreenUpdating = True
-    MsgBox "CRITICAL ERROR in InitializeProcessLog: " & Err.description & " (" & Err.Number & ")", vbCritical
+    If Not SilentMode Then MsgBox "CRITICAL ERROR in InitializeProcessLog: " & Err.description & " (" & Err.Number & ")", vbCritical
     End
 End Sub
 
@@ -156,7 +156,7 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
     
     If Not VerifyRequiredSheets Then
         LogMessage "ERROR: Sheet verification failed. Missing required sheets."
-        MsgBox "Required sheets are missing. Check Process Log for details.", vbCritical
+        If Not SilentMode Then MsgBox "Required sheets are missing. Check Process Log for details.", vbCritical
     Else
         LogMessage "All required sheets verified."
     End If
@@ -250,7 +250,7 @@ Sub GenerateCalculationSheets()
         LogMessage "  Word Count: " & wordCountBenchmark
         LogMessage "  Exam: " & examBenchmark
         LogMessage "  Marking Support: " & markingSupportBenchmark
-        MsgBox "Invalid benchmark values in Dashboard sheet (cells C8, C9, C10).", vbCritical
+        If Not SilentMode Then MsgBox "Invalid benchmark values in Dashboard sheet (cells C8, C9, C10).", vbCritical
         GoTo CleanExit
     End If
     
@@ -298,11 +298,11 @@ CleanExit:
     Application.StatusBar = False
     
     If HasErrorsInLog() Then
-        MsgBox "Errors were detected during generation." & vbCrLf & vbCrLf & _
+        If Not SilentMode Then MsgBox "Errors were detected during generation." & vbCrLf & vbCrLf & _
                "Please check the 'Process Log' sheet for details." & vbCrLf & _
                "Files were NOT exported.", vbExclamation, "Generation Completed with Errors"
     Else
-        MsgBox "Calculation sheets generated and exported successfully!" & vbCrLf & vbCrLf & _
+        If Not SilentMode Then MsgBox "Calculation sheets generated and exported successfully!" & vbCrLf & vbCrLf & _
                "Total time: " & Format(Timer - tStart, "0.0") & " seconds" & vbCrLf & _
                "Check the 'Process Log' sheet for details.", vbInformation
     End If
@@ -324,7 +324,7 @@ ErrorHandler:
     
     Call CleanupPartialSheets(wb)
     
-    MsgBox errMsg & vbCrLf & vbCrLf & "Check the 'Process Log' sheet for more details.", vbCritical
+    If Not SilentMode Then MsgBox errMsg & vbCrLf & vbCrLf & "Check the 'Process Log' sheet for more details.", vbCritical
     On Error GoTo 0
 End Sub
 
@@ -498,7 +498,7 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
         newWB.SaveAs FileName:=tempPath, fileFormat:=fileFormat
         
         If Err.Number = 0 Then
-            MsgBox "Could not save to SharePoint." & vbCrLf & vbCrLf & _
+            If Not SilentMode Then MsgBox "Could not save to SharePoint." & vbCrLf & vbCrLf & _
                    "File saved to:" & vbCrLf & tempPath, vbInformation
             savePath = tempPath
             LogMessage "Saved to temp location: " & tempPath

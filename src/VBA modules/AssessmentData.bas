@@ -50,7 +50,7 @@ Sub ParseAssessmentData()
     Call FormatOutput(wsTarget, currentRow)
     
     ' Show completion message
-    MsgBox "Assessment data parsing completed! " & (currentRow - 2) & " records processed."
+    If Not SilentMode Then MsgBox "Assessment data parsing completed! " & (currentRow - 2) & " records processed."
 End Sub
 
 Sub SetupHeaders(wsTarget As Worksheet)

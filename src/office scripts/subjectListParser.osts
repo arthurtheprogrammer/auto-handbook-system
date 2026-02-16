@@ -24,10 +24,12 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     }
     console.log("Table 'subject_list' found.");
 
-    // Helper function to find JSON property by keyword
+    // Helper function to find JSON property by keyword (handles line breaks and whitespace in headers)
     const findJsonProperty = (obj: SubjectRecord, keyword: string): string => {
+      const normalizedKeyword = keyword.toLowerCase().replace(/\s+/g, ' ').trim();
       for (const key in obj) {
-        if (key.toLowerCase().includes(keyword.toLowerCase())) {
+        const normalizedKey = key.toLowerCase().replace(/\s+/g, ' ').trim();
+        if (normalizedKey.includes(normalizedKeyword)) {
           return obj[key] || "";
         }
       }
@@ -61,8 +63,9 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
       // Apply exclude rules
       let isExcluded: boolean = false;
 
-      // Rule 1: Exclude if subject code contains FNCE
-      if (subjectCode.toUpperCase().includes("FNCE")) {
+      // Rule 1: Exclude if subject code contains FNCE, ACCT, or ECON
+      const codeUpper = subjectCode.toUpperCase();
+      if (codeUpper.includes("FNCE") || codeUpper.includes("ACCT") || codeUpper.includes("ECON")) {
         isExcluded = true;
       }
 

@@ -11,7 +11,7 @@ Sub GenerateSubjectQueries()
     On Error GoTo 0
     
     If ws Is Nothing Then
-        MsgBox "Worksheet 'AllSubjectsHTML' not found."
+        If Not SilentMode Then MsgBox "Worksheet 'AllSubjectsHTML' not found."
         Exit Sub
     End If
     
@@ -21,7 +21,7 @@ Sub GenerateSubjectQueries()
     On Error GoTo 0
     
     If tbl Is Nothing Then
-        MsgBox "Table 'AllSubjectsHTML' not found on the worksheet."
+        If Not SilentMode Then MsgBox "Table 'AllSubjectsHTML' not found on the worksheet."
         Exit Sub
     End If
     
@@ -45,7 +45,7 @@ Sub GenerateSubjectQueries()
     ' Format the table
     Call FormatTableCleanup(ws, tbl)
     
-    MsgBox "Query refreshed and formatted successfully."
+    If Not SilentMode Then MsgBox "Query refreshed and formatted successfully."
 End Sub
 
 
