@@ -90,7 +90,7 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 The `teachingStreamParser` Office Script updates the `progress_bar` table in the source workbook, which the VBA `MonitorAndExecute` loop watches (cell F5) for completion.
 
 > [!TIP]
-**`Done`** = the Power Automate flow finished successfully. **`Complete`** = the VBA monitoring loop detected the update and proceeded to the next step. If you only see `Done` but the process stalls, apply the same troubleshooting advice from the [Subject List Refresh](#subject-list-refresh).
+> **`Done`** = the Power Automate flow finished successfully. **`Complete`** = the VBA monitoring loop detected the update and proceeded to the next step. If you only see `Done` but the process stalls, apply the same troubleshooting advice from the [Subject List Refresh](#subject-list-refresh).
 
 ---
 

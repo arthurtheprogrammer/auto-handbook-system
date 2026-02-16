@@ -282,7 +282,7 @@ The exported calculation file has a **Refresh** button in cell L2 on each sheet.
 These three settings need to be configured **once per computer** before first use.
 
 > [!IMPORTANT]
-> All three are **required**. Without them, macros won't run, enrolment numbers won't load, and calculations may not update.
+> All three are **required**. Without them, macros might not run properly, enrolment numbers might not load, and calculations might not update.
 
 <details>
 <summary><strong>1. Enable VBA Macros</strong> — required for macros and LecturerRefresh export</summary>
@@ -295,7 +295,7 @@ These three settings need to be configured **once per computer** before first us
 4. Click the **Trust Center Settings...** button
 5. In the left sidebar, click **Macro Settings**
 6. Select **Enable VBA macros**
-7. ✅ Also tick **Trust access to the VBA project object model** (required for the LecturerRefresh module to export into the calculation file)
+7. Also tick **Trust access to the VBA project object model** (required for the LecturerRefresh module to export into the calculation file)
 8. Click **OK** → **OK**
 
 #### Mac
@@ -329,8 +329,7 @@ These three settings need to be configured **once per computer** before first us
 3. If prompted about data connections, click **Enable**
 4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
 
-> [!TIP]
-> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
+**💡 Tip**: If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
 
 </details>
 
