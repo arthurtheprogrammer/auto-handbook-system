@@ -11,7 +11,7 @@ A guide for team members who manage the data sources and run the system. No codi
 - [What You Need to Maintain](#what-you-need-to-maintain)
 - [Data Source Reference](#data-source-reference)
 - [Dashboard Parameters](#dashboard-parameters)
-- [Understanding the Output](#understanding-the-output-marking--admin-support-calculations-spreadsheet)
+- [Understanding the Output](#understanding-the-output-marking--admin-support-calculations)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
 - [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
@@ -240,7 +240,7 @@ These tables are populated automatically to build towards the final output sprea
 
 ---
 
-## Understanding the Output (`Marking & Admin Support Calculations` spreadsheet)
+## Understanding the Output (`Marking & Admin Support Calculations`)
 
 The system produces a file like: `[YEAR] Marking Admin Support Calculations.xlsm`
 
