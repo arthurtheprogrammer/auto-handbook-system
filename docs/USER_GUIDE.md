@@ -372,7 +372,7 @@ The exported calculation file has a **Refresh** button in cell L2 on each sheet.
 
 ---
 
-## Common Issues & Fixes
+## Common Issues & Troubleshooting
 
 ### "Please enter a valid year" error
 - **Cause**: Cell C2 on the Dashboard is empty or contains text

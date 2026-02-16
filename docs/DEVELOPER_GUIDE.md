@@ -19,7 +19,7 @@ Technical reference for maintaining and extending the Auto Handbook System.
 
 ## Architecture Overview
 
-The system has **four processing layers** that execute in sequence:
+The system has **4 processing layers** that execute in sequence:
 
 ```mermaid
 flowchart TD

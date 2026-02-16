@@ -30,7 +30,7 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     statusesArray.forEach((item: StatusEntry) => {
       // Staff sheet: match "Title Given Name Family Name" column for the display name
       // and "Status DO NOT SORT" column for employment status
-      const name = findJsonProperty(item, "Title Given Name");
+      const name = findJsonProperty(item, "Title Given Name Family Name");
       const status = findJsonProperty(item, "Status");
       if (name.trim()) {
         statusMap.set(name.trim(), status.trim());

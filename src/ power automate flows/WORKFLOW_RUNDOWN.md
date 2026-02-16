@@ -7,8 +7,9 @@ This folder contains the two cloud flows that power the data ingestion pipeline.
 ## Flow 1: Subject List Refresh
 
 **File**: [subjectlist.json](subjectlist.json)
+**Visual Diagram**: ![Subject List flow diagram](subject%20list%20workflow.png)
 **Trigger**: HTTP POST from `TriggerSubjectListWorkflow()` in `SubjectListRefresh.bas`
-**Purpose**: Reads the Enrolment Tracker from SharePoint, filters to active subjects, and runs the `subjectListParser` Office Script to populate the `subject_list` table.
+**Purpose**: Reads the Enrolment Tracker from SharePoint, filters active subjects, and runs the `subjectListParser` Office Script to populate the `subject_list` table.
 
 ### Input Parameters
 
@@ -40,11 +41,15 @@ This folder contains the two cloud flows that power the data ingestion pipeline.
 
 The `subjectListParser` Office Script updates the `progress_bar` table in the source workbook, which the VBA `MonitorAndExecute` loop watches (cell F2) for completion.
 
+> [!TIP]
+> **`Done`** = the Power Automate flow finished successfully. **`Complete`** = the VBA monitoring loop detected the update and proceeded to the next step. If you only see `Done` but the process stalls, the VBA may have timed out due to heavy computing load on your machine — try closing memory-consuming apps or browser tabs (e.g. Chrome) and re-run the programme again. Alternatively, borrow a spare laptop from reception and run it from that machine.
+
 ---
 
 ## Flow 2: Teaching Stream Refresh
 
 **File**: [teachingstream.json](teachingstream.json)
+**Visual Diagram**: ![Teaching Stream flow diagram](teaching%20stream%20workflow.png)
 **Trigger**: HTTP POST from `TriggerTeachingStreamWorkflow()` in `TeachingStreamRefresh.bas`
 **Purpose**: Reads the Teaching Matrix (two tables: Teaching Data and Staff), filters and transforms the data, then runs the `teachingStreamParser` Office Script to populate the `teaching_stream` table.
 
@@ -84,6 +89,9 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 
 The `teachingStreamParser` Office Script updates the `progress_bar` table in the source workbook, which the VBA `MonitorAndExecute` loop watches (cell F5) for completion.
 
+> [!TIP]
+**`Done`** = the Power Automate flow finished successfully. **`Complete`** = the VBA monitoring loop detected the update and proceeded to the next step. If you only see `Done` but the process stalls, apply the same troubleshooting advice from the [Subject List Refresh](#subject-list-refresh).
+
 ---
 
 ## SharePoint Paths
@@ -105,4 +113,4 @@ These table names in the source Excel files must not be changed:
 | Enrolment Tracker | `Enrolment_Tracker` | Subject List flow |
 | Teaching Matrix | `Teaching_Data` | Teaching Stream flow |
 | Teaching Matrix | `Staff_table` | Teaching Stream flow |
-| Source workbook | `progress_bar` | Both flows (completion signal) |
+| Automated Handbook Data System | `progress_bar` | Both flows (completion signal) |
