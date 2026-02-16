@@ -112,8 +112,7 @@ Sub GenerateSubjectQueries()
                        "Check the Status column in AllSubjectsHTML for details.", _
                        vbExclamation, "Refresh Complete (with errors)"
             Else
-                MsgBox "Query refreshed and formatted successfully — " & totalRows & _
-                       "/" & totalRows & " succeeded.", vbInformation, "Refresh Complete"
+                MsgBox "Query refreshed and formatted successfully — " & totalRows & " succeeded.", vbInformation, "Refresh Complete"
             End If
         Else
             MsgBox "Query refreshed and formatted successfully."

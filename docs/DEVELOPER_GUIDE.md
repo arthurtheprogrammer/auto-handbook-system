@@ -78,6 +78,9 @@ When `GenerateMarkingSupport()` is called:
 2. Extracts relevant data as JSON
 3. Passes JSON to an Office Script in the target workbook
 4. The Office Script parses and writes data to the appropriate table
+5. The Office Script writes `"Done"` to the `progress_bar` table as a completion signal
+
+> **"Done" vs "Complete"**: `Done` = the Power Automate flow finished successfully. `Complete` = the VBA monitoring loop (`MonitorAndExecute`) detected the update and proceeded. If the Dashboard shows `Done` but the process stalls, the VBA polling may have timed out.
 
 #### Flow 1: Subject List Refresh
 
@@ -96,10 +99,11 @@ When `GenerateMarkingSupport()` is called:
 | Property | Value |
 |----------|-------|
 | Trigger | HTTP POST from `TeachingStreamRefresh.bas` |
-| Source | Teaching Matrix (`.xlsx`) on SharePoint |
+| Source | Teaching Matrix (`.xlsx`) on SharePoint — uses **two** Excel Online (Business) connections |
 | Script | `teachingStreamParser.osts` |
 | Target | `teaching_stream` table in `teaching stream` sheet |
 | Status Cell | Dashboard `F5` |
+| Pagination | Staff table reads up to **5000 rows** (Power Automate default limit) |
 
 **Payload**: `{ "year": 2026, "teachingMatrixFilename": "...", "email": "..." }`
 
@@ -124,6 +128,7 @@ The `AllSubjectsHTML` Power Query:
 - Reads raw HTML from `AllSubjectsHTML` table
 - Parses assessment details (name, word count, exam type, group size, quantity)
 - Writes structured records to `assessment data parsed` sheet
+- **In-class assessment detection**: `CheckIfInClass()` scans descriptions for keywords: `participation`, `presentation`, `attendance`, `pitch`, `online`, `ongoing`, `in class`. When matched, word count and exam duration are set to `0`
 
 ### Layer 4: Output Generation
 
@@ -133,6 +138,13 @@ The `AllSubjectsHTML` Power Query:
 - Generates calculation sheets with benchmarks (word count/hr, exams/hr, marking support hrs/stream)
 - Exports to a new `.xlsm` workbook with `LecturerRefresh.bas` module embedded
 - Adds "Refresh" buttons to the exported sheets
+- **Sheet protection**: `Protect` is called with `AllowFormattingCells/Columns/Rows = True`, `AllowInsertingRows = False`, `AllowDeletingRows = False`, no password. Locked columns: **A–J** and **Q–R**
+
+**Auto-exclusion rules** (applied by `subjectListParser.osts` during subject list generation):
+- Subject code contains `FNCE`, `ACCT`, or `ECON`
+- Subject name contains "indigenous" or "indigenising"
+- Last 5 characters of subject code are not numeric
+- Delivery mode contains "online" or "offshore"
 
 ---
 
@@ -236,6 +248,31 @@ The `AllSubjectsHTML` Power Query:
 | Enrolment Tracker (`.xlsx`) | `/TEACHING MATRIX & ENROLMENT TRACKER/` | Source of subject codes, names, coordinators, study periods |
 | Teaching Matrix (`.xlsx`) | `/TEACHING MATRIX & ENROLMENT TRACKER/` | Source of lecturer assignments, activity codes, stream counts |
 | Automated Handbook Data System (`.xlsm`) | `/TEACHING SUPPORT/Handbook (.../Auto Handbook System/` | The main workbook containing all the macros |
+
+**SharePoint identifiers** (hardcoded in Power Automate flows):
+
+| Item | Value |
+|------|-------|
+| Site Group ID | `ad6c8e15-4773-48f0-a918-df5ce6b5a0ec` |
+| Source files path | `/Shared Documents/TEACHING MATRIX & ENROLMENT TRACKER/` |
+| Target workbook path | `/Shared Documents/TEACHING SUPPORT/Handbook (.../Auto Handbook System/Automated Handbook Data System.xlsm` |
+
+### Required Table Names (Do Not Rename)
+
+| File | Table Name | Used By |
+|------|------------|---------|
+| Enrolment Tracker | `Enrolment_Tracker` | Subject List flow (Power Automate) |
+| Enrolment Tracker | `Enrolment_Number` | Calculation sheet formulas (external workbook link for enrolment count) |
+| Teaching Matrix | `Teaching_Data` | Teaching Stream flow (Power Automate) |
+| Teaching Matrix | `Staff_table` | Teaching Stream flow (Power Automate) |
+| Source workbook | `progress_bar` | Both flows (completion signal) |
+| Source workbook | `subject_list` | `CalculationSheets.bas`, `HTMLQuery.bas` |
+| Source workbook | `AllSubjectsHTML` | `HTMLQuery.bas`, `AssessmentData.bas` |
+| Source workbook | `teaching_stream` | `CalculationSheets.bas`, `LecturerRefresh.bas` |
+
+### Column Header Matching
+
+The Office Scripts match column headers using **keyword-contains** (case-insensitive, whitespace-normalised). For example, a header `"Subject Code DO NOT SORT"` matches the keyword `"Subject Code"`. Avoid renaming or restructuring headers — the scripts are tolerant of extra text and line breaks, but not of missing keywords.
 
 ---
 

@@ -77,7 +77,7 @@ Make sure these files exist on SharePoint:
 6. **Done!** The exported file appears in the same SharePoint folder as the source workbook
 
 > [!NOTE]
-> **Running on a Mac?** The Power Query step (F3) fetches handbook data from the university website and only runs on Windows. On Mac it will be **skipped** — the system will show a message and continue using existing data. This is fine after the first proper run each academic year, as handbook content rarely changes once semester starts.
+> **Running on a Mac?** The Subject Queries step (F3) fetches handbook data from the university website and only runs on Windows. On Mac it will be **skipped** — the system will show a message and continue using existing data. This is fine after the first proper run each academic year, as handbook content rarely changes once semester starts.
 
 > **Tip**: If you need to stop the process, run `StopWorkflowMonitoring` from the macro menu.
 
