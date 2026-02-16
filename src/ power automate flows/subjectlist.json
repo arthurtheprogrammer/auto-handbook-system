@@ -1,0 +1,165 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_excelonlinebusiness": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "domm_sharedexcelonlinebusiness_9e8da"
+        },
+        "api": {
+          "name": "shared_excelonlinebusiness"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "metadata": {},
+          "type": "Request",
+          "kind": "Http",
+          "inputs": {
+            "triggerAuthenticationType": "All",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "year": {
+                  "type": "integer"
+                },
+                "enrolmentTrackerFilename": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "actions": {
+        "Get_YEAR_PLANNING_table": {
+          "runAfter": {
+            "If_only_YEAR_entered": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20MATRIX%20&%20ENROLMENT%20TRACKER/@{replace(variables('filePath'),' ','%20')}",
+              "table": "Enrolment_Tracker"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "GetItems",
+              "connectionName": "shared_excelonlinebusiness"
+            }
+          }
+        },
+        "If_only_YEAR_entered": {
+          "actions": {
+            "only_YEAR": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "filePath",
+                "value": "@concat(triggerBody()?['year'],'_M&M_Enrolment Tracker.xlsm')"
+              }
+            }
+          },
+          "runAfter": {
+            "Initialise_File_Path": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {
+              "entered": {
+                "type": "SetVariable",
+                "inputs": {
+                  "name": "filePath",
+                  "value": "@if(\n  endsWith(toLower(triggerBody()?['enrolmentTrackerFilename']), '.xlsm'),\n  triggerBody()?['enrolmentTrackerFilename'],\n  concat(triggerBody()?['enrolmentTrackerFilename'], '.xlsm')\n)"
+                }
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@triggerBody()?['enrolmentTrackerFilename']",
+                  "@''"
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        },
+        "Initialise_File_Path": {
+          "runAfter": {},
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "filePath",
+                "type": "string",
+                "value": "@null"
+              }
+            ]
+          }
+        },
+        "Generate_SubjectList_table": {
+          "runAfter": {
+            "Filter_ACTIVE_subjects": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20SUPPORT/Handbook%20(Course%20&%20Subject%20Changes)/Auto%20Handbook%20System/Automated%20Handbook%20Data%20System.xlsm",
+              "scriptId": "ms-officescript%3A%2F%2Fonedrive_business_itemlink%2F01DB6PNRFJZQL5TD7H6JB2SXOQ4EEYCNCN",
+              "ScriptParameters/subjectData": "@body('Filter_ACTIVE_subjects')",
+              "ScriptParameters/year": "@triggerBody()?['year']",
+              "ScriptParameters/iterationDate": "@formatDateTime(utcNow(), 'yyyyMMdd')"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "RunScriptProd",
+              "connectionName": "shared_excelonlinebusiness"
+            }
+          }
+        },
+        "Filter_ACTIVE_subjects": {
+          "runAfter": {
+            "Get_YEAR_PLANNING_table": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Get_YEAR_PLANNING_table')?['body/value']",
+            "where": "@contains(item()?['Status'],'Active')"
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}

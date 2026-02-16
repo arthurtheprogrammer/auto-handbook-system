@@ -1,0 +1,290 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_excelonlinebusiness": {
+        "api": {
+          "name": "shared_excelonlinebusiness"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "domm_sharedexcelonlinebusiness_9e8da"
+        },
+        "runtimeSource": "embedded"
+      },
+      "shared_excelonlinebusiness-1": {
+        "api": {
+          "name": "shared_excelonlinebusiness"
+        },
+        "connection": {
+          "connectionReferenceLogicalName": "domm_sharedexcelonlinebusiness_a8879"
+        },
+        "runtimeSource": "embedded"
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Http",
+          "inputs": {
+            "triggerAuthenticationType": "All",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "year": {
+                  "type": "integer"
+                },
+                "teachingMatrixFilename": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "metadata": {}
+        }
+      },
+      "actions": {
+        "If_only_YEAR_entered": {
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@triggerBody()?['teachingMatrixFilename']",
+                  "@''"
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "only_YEAR": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "filePath",
+                "value": "@concat(triggerBody()?['year'],'_M&M_Teaching Matrix.xlsm')"
+              },
+              "metadata": {
+                "operationMetadataId": "ae853dae-0c87-47f7-98cc-500b6762f68d"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "entered": {
+                "type": "SetVariable",
+                "inputs": {
+                  "name": "filePath",
+                  "value": "@if(\n  endsWith(toLower(triggerBody()?['teachingMatrixFilename']), '.xlsm'),\n  triggerBody()?['teachingMatrixFilename'],\n  concat(triggerBody()?['teachingMatrixFilename'], '.xlsm')\n)"
+                },
+                "metadata": {
+                  "operationMetadataId": "5dd96e53-6661-4d29-b5ff-65c0121bd1b7"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Initialise_File_Path": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "535afee7-c3d3-4cb5-9544-eb5e06f51d1d"
+          }
+        },
+        "Initialise_File_Path": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "filePath",
+                "type": "string",
+                "value": "@null"
+              }
+            ]
+          },
+          "runAfter": {},
+          "metadata": {
+            "operationMetadataId": "72455b35-c35c-4067-8084-4bdebfe3cddc"
+          }
+        },
+        "List_rows_present_in_Teaching_Data": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20MATRIX%20&%20ENROLMENT%20TRACKER/@{replace(variables('filePath'),' ','%20')}",
+              "table": "Teaching_Data"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "GetItems",
+              "connectionName": "shared_excelonlinebusiness"
+            }
+          },
+          "runAfter": {
+            "Update_progress_cell": [
+              "Succeeded"
+            ]
+          },
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 5000
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "3e29cd80-d7ec-4848-81b7-719631254b38",
+            "tableId": "Teaching_Data"
+          }
+        },
+        "List_rows_present_in_Staff_table": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20MATRIX%20&%20ENROLMENT%20TRACKER/@{replace(variables('filePath'),' ','%20')}",
+              "table": "Staff_table"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "GetItems",
+              "connectionName": "shared_excelonlinebusiness"
+            }
+          },
+          "runAfter": {
+            "Update_progress_cell": [
+              "Succeeded"
+            ]
+          },
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 5000
+            }
+          },
+          "metadata": {
+            "operationMetadataId": "39d9b6cc-5e9c-49c2-9423-bd85692d54c2",
+            "tableId": "Staff_table"
+          }
+        },
+        "Create_Staff_Lookup_Dictionary": {
+          "type": "Select",
+          "inputs": {
+            "from": "@outputs('List_rows_present_in_Staff_table')?['body/value']",
+            "select": {
+              "Name": "@item()?['Title Given Name Family Name']",
+              "Status": "@item()?['Status DO NOT SORT']"
+            }
+          },
+          "runAfter": {
+            "List_rows_present_in_Staff_table": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "5d518c85-821b-4277-85f1-188c34b4847f"
+          }
+        },
+        "Filter_array": {
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('List_rows_present_in_Teaching_Data')?['body/value']",
+            "where": "@and(equals(item()?['Scheduled?'], 'Open'), not(equals(item()?['Activity ID'], '')))\n"
+          },
+          "runAfter": {
+            "List_rows_present_in_Teaching_Data": [
+              "Succeeded"
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "ddff76f8-d5a9-48a5-bdb6-ee45b41e9dcc"
+          }
+        },
+        "Generate_Teaching_Stream_table": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20SUPPORT/Handbook%20(Course%20&%20Subject%20Changes)/Auto%20Handbook%20System/Automated%20Handbook%20Data%20System.xlsm",
+              "scriptId": "ms-officescript%3A%2F%2Fonedrive_business_itemlink%2F01DB6PNRFB5CJG2PIRBJGJXKSTWZFKLRSD",
+              "ScriptParameters/lecturerStreamJson": "@outputs('Lecturer_Stream_string')",
+              "ScriptParameters/lecturerStatusJson": "@outputs('Lecturer_Status_String')"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "RunScriptProd",
+              "connectionName": "shared_excelonlinebusiness"
+            }
+          },
+          "runAfter": {
+            "Lecturer_Status_String": [
+              "Succeeded"
+            ],
+            "Lecturer_Stream_string": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Lecturer_Status_String": {
+          "type": "Compose",
+          "inputs": "@body('Create_Staff_Lookup_Dictionary')",
+          "runAfter": {
+            "Create_Staff_Lookup_Dictionary": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Lecturer_Stream_string": {
+          "type": "Compose",
+          "inputs": "@body('Filter_array')",
+          "runAfter": {
+            "Filter_array": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Update_progress_cell": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "groups/ad6c8e15-4773-48f0-a918-df5ce6b5a0ec",
+              "drive": "b!UBABUhGEKECFhDL41DjVeNoBj9p0MXRKpBFDkjb_i-Tbc9-E_4BBSZknj_ZFBwtq",
+              "file": "/Shared%20Documents/TEACHING%20SUPPORT/Handbook%20(Course%20&%20Subject%20Changes)/Auto%20Handbook%20System/Automated%20Handbook%20Data%20System.xlsm",
+              "table": "{8E73F496-9638-4E27-8B69-D279D66C0D6D}",
+              "idColumn": "Progress",
+              "id": "Teaching Stream",
+              "item/Status": "Running..."
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "operationId": "PatchItem",
+              "connectionName": "shared_excelonlinebusiness-1"
+            }
+          },
+          "runAfter": {
+            "If_only_YEAR_entered": [
+              "SUCCEEDED"
+            ]
+          }
+        }
+      }
+    },
+    "templateName": null
+  },
+  "schemaVersion": "1.0.0.0"
+}
