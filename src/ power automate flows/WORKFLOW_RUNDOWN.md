@@ -6,9 +6,9 @@ This folder contains the two cloud flows that power the data ingestion pipeline.
 
 ## Flow 1: Subject List Refresh
 
-**File**: [subjectlist.json](subjectlist.json)
-**Visual Diagram**: ![Subject List flow diagram](subject%20list%20workflow.png)
-**Trigger**: HTTP POST from `TriggerSubjectListWorkflow()` in `SubjectListRefresh.bas`
+**File**: [subjectlist.json](subjectlist.json)<br>
+**Visual Diagram**: ![Subject List flow diagram](subject%20list%20workflow.png)<br>
+**Trigger**: HTTP POST from `TriggerSubjectListWorkflow()` in `SubjectListRefresh.bas`<br>
 **Purpose**: Reads the Enrolment Tracker from SharePoint, filters active subjects, and runs the `subjectListParser` Office Script to populate the `subject_list` table.
 
 ### Input Parameters
@@ -48,9 +48,9 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 
 ## Flow 2: Teaching Stream Refresh
 
-**File**: [teachingstream.json](teachingstream.json)
-**Visual Diagram**: ![Teaching Stream flow diagram](teaching%20stream%20workflow.png)
-**Trigger**: HTTP POST from `TriggerTeachingStreamWorkflow()` in `TeachingStreamRefresh.bas`
+**File**: [teachingstream.json](teachingstream.json)<br>
+**Visual Diagram**: ![Teaching Stream flow diagram](teaching%20stream%20workflow.png)<br>
+**Trigger**: HTTP POST from `TriggerTeachingStreamWorkflow()` in `TeachingStreamRefresh.bas`<br>
 **Purpose**: Reads the Teaching Matrix (two tables: Teaching Data and Staff), filters and transforms the data, then runs the `teachingStreamParser` Office Script to populate the `teaching_stream` table.
 
 ### Input Parameters
