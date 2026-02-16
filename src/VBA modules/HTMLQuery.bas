@@ -84,7 +84,41 @@ Sub GenerateSubjectQueries()
     ' Format the table
     Call FormatTableCleanup(ws, tbl)
     
-    If Not SilentMode Then MsgBox "Query refreshed and formatted successfully."
+    ' =========================================================================
+    ' POST-REFRESH STATUS CHECK
+    ' =========================================================================
+    If Not SilentMode Then
+        Dim statusCol As Range
+        On Error Resume Next
+        Set statusCol = tbl.ListColumns("Status").DataBodyRange
+        On Error GoTo 0
+        
+        If Not statusCol Is Nothing Then
+            Dim totalRows As Long, failedRows As Long
+            Dim statusCell As Range
+            totalRows = statusCol.Rows.Count
+            failedRows = 0
+            
+            For Each statusCell In statusCol
+                If UCase(Trim(statusCell.Value)) = "FAILED" Then
+                    failedRows = failedRows + 1
+                End If
+            Next statusCell
+            
+            If failedRows > 0 Then
+                MsgBox "Query refreshed — " & (totalRows - failedRows) & "/" & totalRows & _
+                       " succeeded, " & failedRows & " failed." & vbCrLf & vbCrLf & _
+                       "Failed subjects may have invalid handbook URLs." & vbCrLf & _
+                       "Check the Status column in AllSubjectsHTML for details.", _
+                       vbExclamation, "Refresh Complete (with errors)"
+            Else
+                MsgBox "Query refreshed and formatted successfully — " & totalRows & _
+                       "/" & totalRows & " succeeded.", vbInformation, "Refresh Complete"
+            End If
+        Else
+            MsgBox "Query refreshed and formatted successfully."
+        End If
+    End If
 End Sub
 
 

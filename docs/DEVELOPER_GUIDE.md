@@ -62,7 +62,7 @@ When `GenerateMarkingSupport()` is called:
 | 2 | `SubjectListRefresh.bas` | HTTP POST to Power Automate → triggers `subjectListParser.osts` → populates `SubjectList` table |
 | 3 | `TeachingStreamRefresh.bas` | HTTP POST to Power Automate → triggers `teachingStreamParser.osts` → populates `teaching_stream` table |
 | 4 | `Integration.bas` | Monitors Dashboard F2 and F5 cells for "Done" (polling loop, 2s interval, 30min timeout) |
-| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment HTML from handbook.unimelb.edu.au) |
+| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment HTML from handbook.unimelb.edu.au). **Skipped on Mac** — Power Query is Windows-only |
 | 6 | `AssessmentData.bas` | Parses HTML from `AllSubjectsHTML` → writes structured data to `assessment data parsed` sheet |
 | 7 | `CalculationSheets.bas` | Generates `FHY Calculations` and `SHY Calculations` sheets, exports to new `.xlsm` with `LecturerRefresh.bas` embedded |
 | 8 | `Integration.bas` | Sends email notification, sets `SilentMode = False` |
@@ -115,8 +115,10 @@ The `AllSubjectsHTML` Power Query:
 ### Layer 3: VBA Data Processing
 
 **HTMLQuery.bas** (`GenerateSubjectQueries`):
-- Refreshes the Power Query table
+- **Mac**: Detects via `#If Mac Then`, skips refresh with user warning, formats existing data only
+- **Windows**: Refreshes via `tbl.QueryTable` or targeted `wb.Connections` lookup (avoids `RefreshAll`)
 - Formats columns, sets hyperlinks, applies table style
+- Post-refresh status check: counts success/failed rows (shown only when run individually, suppressed by `SilentMode`)
 
 **AssessmentData.bas** (`ParseAssessmentData`):
 - Reads raw HTML from `AllSubjectsHTML` table
@@ -173,7 +175,7 @@ The `AllSubjectsHTML` Power Query:
 
 | Function | Purpose |
 |----------|---------|
-| `GenerateSubjectQueries()` | Refreshes `AllSubjectsHTML` Power Query table, applies formatting |
+| `GenerateSubjectQueries()` | Mac detection → Power Query refresh (targeted connection) → format → post-refresh status check |
 | `FormatTableCleanup()` | Standardizes row heights, column widths, hyperlinks, table style |
 
 ### AssessmentData.bas
@@ -254,7 +256,7 @@ The `AllSubjectsHTML` Power Query:
 | `C16` | Last run start time (auto-filled) | `Integration.bas` |
 | `C17` | Elapsed time (formula, then frozen) | `Integration.bas` |
 | `F2` | **Subject List Refresh status** (monitored for "Done") | `Integration.bas`, `subjectListParser.osts` |
-| `F3` | GenerateSubjectQueries status | `Integration.bas` |
+| `F3` | GenerateSubjectQueries status (shows **Skipped** on Mac) | `Integration.bas` |
 | `F4` | ParseAssessmentData status | `Integration.bas` |
 | `F5` | **Teaching Stream Refresh status** (monitored for "Done") | `Integration.bas`, `teachingStreamParser.osts` |
 | `F6` | GenerateCalculationSheets status | `Integration.bas` |
@@ -282,10 +284,12 @@ The `AllSubjectsHTML` Power Query:
 | 17 | Q | Allocated Marking |
 | 18 | R | Marking Support Hours Available |
 | 19 | S | Lecturer Notes |
-| 20–29 | T–AC | Marker 1 block (Assessment Details → Contract Requested) |
-| 30–39 | AD–AM | Marker 2 block |
-| 40–49 | AN–AW | Marker 3 block |
+| 20–29 | T–AC | Marker 1 block — all editable (Name, Assessment Details, Word Count, Exam, Group Size, Assessment Quantity, Marking Allocation, Email, Arrangement Notes, Contract Requested) |
+| 30–39 | AD–AM | Marker 2 block (same structure) |
+| 40–49 | AN–AW | Marker 3 block (same structure) |
 
+> **Locked columns**: A–J and Q–R only. All marker block columns (T–AW) are **unlocked** — users can overwrite formulas to create custom marking arrangements.
+>
 > **LecturerRefresh** updates columns **L–O** only and preserves **P–S** (user edits).
 
 ---
@@ -303,7 +307,7 @@ The `SilentMode` global variable controls whether `MsgBox` calls are displayed:
 | Module | MsgBox Count Guarded |
 |--------|---------------------|
 | `AssessmentData.bas` | 1 |
-| `HTMLQuery.bas` | 3 |
+| `HTMLQuery.bas` | 5 (includes Mac warning + post-refresh status) |
 | `CalculationSheets.bas` | 11 |
 
 ---
@@ -312,9 +316,11 @@ The `SilentMode` global variable controls whether `MsgBox` calls are displayed:
 
 The system supports both **Mac** and **Windows**:
 
+- **Power Query** (AllSubjectsHTML refresh) is **Windows-only**. On Mac, the refresh is skipped with a user-facing warning — the process continues using existing data. This is acceptable after the first run each academic year since handbook content rarely changes after semester starts.
 - HTTP requests use `#If Mac Then` conditional compilation
   - Mac: `MacScript("do shell script ""curl ...""")` via AppleScript
   - Windows: `MSXML2.XMLHTTP` / `MSXML2.ServerXMLHTTP` COM objects
+- `Integration.bas` sets F3 status to **"Skipped"** (grey) on Mac instead of "Complete" (green)
 - Path separators handled via `Application.PathSeparator`
 - `LecturerRefresh.bas` uses Mac-compatible 2D arrays instead of Collections for return types
 
