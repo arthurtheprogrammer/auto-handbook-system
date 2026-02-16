@@ -69,12 +69,15 @@ Make sure these files exist on SharePoint:
    | Cell | Step | Status |
    |------|------|--------|
    | F2 | Subject List Refresh | Running... → Complete |
-   | F3 | Generate Subject Queries | Running... → Complete |
+   | F3 | Generate Subject Queries | Running... → Complete (or **Skipped** on Mac) |
    | F4 | Parse Assessment Data | Running... → Complete |
    | F5 | Teaching Stream Refresh | Running... → Complete |
    | F6 | Generate Calculation Sheets | Running... → Complete |
 
 6. **Done!** The exported file appears in the same SharePoint folder as the source workbook
+
+> [!NOTE]
+> **Running on a Mac?** The Power Query step (F3) fetches handbook data from the university website and only runs on Windows. On Mac it will be **skipped** — the system will show a message and continue using existing data. This is fine after the first proper run each academic year, as handbook content rarely changes once semester starts.
 
 > **Tip**: If you need to stop the process, run `StopWorkflowMonitoring` from the macro menu.
 

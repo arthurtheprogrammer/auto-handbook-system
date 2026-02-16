@@ -250,10 +250,17 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
     GenerateSubjectQueries
     On Error GoTo 0
     
-    With ws.Range("F3")
-        .Value = "Complete"
-        .Interior.Color = RGB(146, 208, 80)
-    End With
+    #If Mac Then
+        With ws.Range("F3")
+            .Value = "Skipped"
+            .Interior.Color = RGB(191, 191, 191) ' Grey
+        End With
+    #Else
+        With ws.Range("F3")
+            .Value = "Complete"
+            .Interior.Color = RGB(146, 208, 80)
+        End With
+    #End If
     DoEvents
     
     ' Macro 2: ParseAssessmentData

@@ -25,17 +25,56 @@ Sub GenerateSubjectQueries()
         Exit Sub
     End If
     
-    ' Refresh the query table (this waits until complete by default)
+    ' =========================================================================
+    ' MAC DETECTION — Power Query is Windows-only
+    ' =========================================================================
+    #If Mac Then
+        If Not SilentMode Then
+            MsgBox "Power Query refresh is not compatible with Mac." & vbCrLf & vbCrLf & _
+                   "The handbook data will not be refreshed, but the rest of the " & _
+                   "process will continue using existing data." & vbCrLf & vbCrLf & _
+                   "This is fine after the first run each year — handbook content " & _
+                   "rarely changes after semester starts.", _
+                   vbInformation, "Mac Detected"
+        End If
+        
+        Application.StatusBar = "Skipped Power Query refresh (Mac)..."
+        DoEvents
+        Application.StatusBar = False
+        
+        ' Still format existing data
+        Call FormatTableCleanup(ws, tbl)
+        Exit Sub
+    #End If
+    
+    ' =========================================================================
+    ' WINDOWS — Refresh the Power Query connection
+    ' =========================================================================
     Application.StatusBar = "Refreshing AllSubjectsHTML query..."
     
     On Error Resume Next
-    ' Try to refresh via QueryTable
+    ' Try to refresh via QueryTable first
     If Not tbl.QueryTable Is Nothing Then
         tbl.QueryTable.BackgroundQuery = False
         tbl.QueryTable.Refresh BackgroundQuery:=False
     Else
-        ' Or refresh all queries in the workbook and wait
-        wb.RefreshAll
+        ' Target specific Power Query connection by name
+        Dim conn As WorkbookConnection
+        Dim connFound As Boolean
+        connFound = False
+        
+        For Each conn In wb.Connections
+            If InStr(1, conn.Name, "AllSubjectsHTML", vbTextCompare) > 0 Then
+                conn.Refresh
+                connFound = True
+                Exit For
+            End If
+        Next conn
+        
+        ' Last resort — should not normally reach here
+        If Not connFound Then
+            wb.RefreshAll
+        End If
         DoEvents
     End If
     On Error GoTo 0
