@@ -6,7 +6,6 @@ A guide for team members who manage the data sources and run the system. No codi
 
 ## Table of Contents
 
-- [First-Time Setup (Excel Trust & Calculation Settings)](#first-time-setup-excel-trust--calculation-settings)
 - [How It Works (Simple Version)](#how-it-works-simple-version)
 - [Running the System](#running-the-system)
 - [What You Need to Maintain](#what-you-need-to-maintain)
@@ -14,102 +13,8 @@ A guide for team members who manage the data sources and run the system. No codi
 - [Dashboard Parameters](#dashboard-parameters)
 - [Understanding the Output](#understanding-the-output)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
-- [Common Issues & Fixes](#common-issues--fixes)
-
----
-
-## First-Time Setup (Excel Trust & Calculation Settings)
-
-Before using the system for the first time, you need to configure three settings in Excel. These only need to be done **once per computer**.
-
-> [!IMPORTANT]
-> All three settings below are **required**. Without them, macros won't run, enrolment numbers won't load, and calculations may not update.
-
----
-
-### 1. Enable VBA Macros (Trust Center)
-
-This allows the system's macros to run — including the **LecturerRefresh** module that is embedded in the exported calculation file.
-
-#### Windows
-
-1. Open Excel
-2. Go to **File** → **Options**
-3. In the left sidebar, click **Trust Center**
-4. Click the **Trust Center Settings...** button
-5. In the left sidebar, click **Macro Settings**
-6. Select **Enable VBA macros (not recommended; potentially dangerous code can run)**
-   - Alternatively, select **Disable VBA macros except digitally signed macros** if your organisation signs macros
-7. Also tick **Trust access to the VBA project object model** (required for exporting the LecturerRefresh module into the calculation file)
-8. Click **OK** → **OK**
-
-#### Mac
-
-1. Open Excel
-2. Go to **Excel** (menu bar) → **Preferences**
-3. Click **Security & Privacy**
-4. Under **Macro Security**, select **Enable all macros**
-5. Close the preferences window
-
----
-
-### 2. Enable External Links & Data Connections (Trust Center)
-
-This allows the workbook to pull enrolment numbers from the Enrolment Tracker file via external connection formulas (e.g., linked workbook references).
-
-#### Windows
-
-1. Open Excel
-2. Go to **File** → **Options**
-3. In the left sidebar, click **Trust Center**
-4. Click the **Trust Center Settings...** button
-5. In the left sidebar, click **External Content**
-6. Under **Security settings for Workbook Links**, select **Enable automatic update for all Workbook Links**
-7. Under **Security settings for Data Connections**, select **Enable all Data Connections**
-8. Click **OK** → **OK**
-
-#### Mac
-
-1. Open the workbook
-2. If you see a **Security Warning** bar at the top saying "Automatic update of links has been disabled", click **Enable Content**
-3. If prompted about data connections, click **Enable**
-4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
-
-> [!TIP]
-> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings might not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
-
----
-
-### 3. Set Calculation Mode to Automatic
-
-The system requires automatic calculation so that formulas (including enrolment lookups and elapsed-time tracking) update in real time.
-
-#### Windows
-
-1. Open Excel
-2. Go to **Formulas** tab on the ribbon
-3. Click **Calculation Options** (in the Calculation group)
-4. Select **Automatic**
-
-Or via settings:
-1. Go to **File** → **Options** → **Formulas**
-2. Under **Calculation options**, set **Workbook Calculation** to **Automatic**
-3. Click **OK**
-
-#### Mac
-
-1. Open Excel
-2. Go to **Formulas** tab on the ribbon
-3. Click **Calculation Options**
-4. Select **Automatic**
-
-Or via preferences:
-1. Go to **Excel** → **Preferences** → **Calculation**
-2. Under **Calculation**, select **Automatically**
-3. Close the preferences window
-
-> [!NOTE]
-> The system sets calculation to Automatic, but good to check for troubleshooting if you notice the numbers are not updating.
+- [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
+- [Common Issues & Troubleshooting](#common-issues--troubleshooting)
 
 ---
 
@@ -369,6 +274,44 @@ The exported calculation file has a **Refresh** button in cell L2 on each sheet.
 4. Wait about 1–2 minutes for completion
 
 > **Important**: Your edits in columns P (Stream Enrolment) and S (Lecturer Notes) are always preserved during a refresh. Only columns L–O are updated.
+
+---
+
+## First-Time Setup (Excel Trust & Calculation Settings)
+
+These three settings need to be configured **once per computer** before first use.
+
+> [!IMPORTANT]
+> All three are **required**. Without them, macros won't run, enrolment numbers won't load, and calculations may not update.
+
+<details>
+<summary><strong>1. Enable VBA Macros</strong> — required for macros and LecturerRefresh export</summary>
+
+**Windows**: File → Options → Trust Center → Trust Center Settings → Macro Settings → **Enable VBA macros** + tick **Trust access to the VBA project object model** → OK
+
+**Mac**: Excel → Preferences → Security & Privacy → **Enable all macros**
+
+</details>
+
+<details>
+<summary><strong>2. Enable External Links & Data Connections</strong> — required for enrolment numbers</summary>
+
+**Windows**: File → Options → Trust Center → Trust Center Settings → External Content → **Enable automatic update for all Workbook Links** + **Enable all Data Connections** → OK
+
+**Mac**: Click **Enable Content** on the Security Warning bar, or Excel → Preferences → Security & Privacy → allow external content
+
+> If enrolment numbers show as `0` or `#REF!`, go to **Data → Edit Links → Update Values**.
+
+</details>
+
+<details>
+<summary><strong>3. Set Calculation Mode to Automatic</strong> — required for real-time formula updates</summary>
+
+**Windows / Mac**: Formulas tab → Calculation Options → **Automatic**
+
+Or via settings: File → Options → Formulas → Workbook Calculation → **Automatic** (Windows) / Excel → Preferences → Calculation → **Automatically** (Mac)
+
+</details>
 
 ---
 
