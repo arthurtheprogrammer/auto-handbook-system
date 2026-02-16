@@ -251,11 +251,92 @@ This file contains two sheets:
 | **FHY Calculations** | First-half year subjects (Summer Term, Semester 1) |
 | **SHY Calculations** | Second-half year subjects (Winter Term, Semester 2) |
 
-Each sheet has subjects organised by study period, with:
-- **Assessment details** (columns E–K): List of assessments and their characteristics
-- **Lecturer information** (columns L–O): Who teaches each stream and their staff status
-- **Marking allocation** (columns P–R): Stream enrolment and marking hours *(you fill these in)*
-- **Marker blocks** (columns T onwards): Space for 3 markers per subject *(can add more if needed, just copy and paste)*
+### Column Layout
+
+Each sheet has subjects organised by study period. Here is the full column breakdown:
+
+🔒 = locked (formula or system-generated) &emsp; ✏️ = editable (working space for users)
+
+#### Subject Info (A–D)
+
+| Col | Section | | Description |
+|-----|---------|:-:|-------------|
+| A | UID | 🔒 | **Hidden** - can be used to filter, but recommended to just **search by subject code**)|
+| B | Subject Code | 🔒 | e.g., `MGMT10001` |
+| C | Study Period | 🔒 | e.g., `Semester 1` |
+| D | Enrolment | 🔒 | **Formula** — `INDEX/SUMPRODUCT` linking to the Enrolment Tracker on SharePoint to pull live enrolment count |
+
+#### Assessment Data (E–K)
+
+Columns E–J are locked because they contain formulas referencing the `assessment data parsed` sheet and handbook data. Editing them would break the automatic calculations.
+
+| Col | Section | | Description |
+|-----|---------|:-:|-------------|
+| E | Assessment Details | 🔒 | Individual assessment details — looked up from the `assessment data parsed` sheet |
+| F | Word Count | 🔒 | Word count per assessment, parsed from handbook data |
+| G | Exam | 🔒 | Exam duration (`Y`/`N`), parsed from handbook data |
+| H | Group Size | 🔒 | Group size if applicable, parsed from handbook data |
+| I | Assessment Quantity | 🔒 | **Formula** — calculates quantity per student (`enrolment ÷ group size` if group work). Set to `0` for in-class assessments detected by keyword (see [Overwriting Protected Cells](#overwriting-protected-cells) for details) |
+| J | Marking Hours | 🔒 | **Formula** — `quantity × word count ÷ benchmark` (written) or `quantity ÷ exam benchmark` (exams). Benchmarks set in J2/J3. The total row sums all assessments for the subject |
+| K | Assessment Notes | ✏️ | Free-text notes about specific assessments |
+
+#### Lecturer & Streams (L–S)
+
+| Col | Section | | Description |
+|-----|---------|:-:|-------------|
+| L | Lecturer/Instructors | ✏️ | Lecturer names — auto-populated from teaching stream data, refreshable via the Refresh button |
+| M | Status | ✏️ | Staff status (`Continuing T&R` highlighted to indicate eligibility for marking support) — auto-populated from staff data |
+| N | Stream # | ✏️ | **Hidden** Stream number |
+| O | Activity Code | ✏️ | aggregated activity code from Allocate+ (e.g., `S01_01; S01_02`) |
+| P | Stream(s) Enrolment | ✏️ | **Manual Entry** - enrolment count per stream |
+| Q | Allocated Marking | 🔒 | **Formula** — `Stream # x 20 hrs/stream (default/benchmark set on Dashboard C10)` |
+| R | Marking Support Hours Available | 🔒 | **Formula** — `Total Marking Hours - Allocated Marking` |
+| S | Lecturer Notes | ✏️ | Free-text notes about the lecturer/stream |
+
+#### Marker Blocks (T–AW) — 3 identical blocks of 10 columns each
+
+Each subject has space for **3 markers**. Markers 2 (AD–AM) and 3 (AN–AW) follow the exact same 10-column structure as Marker 1 below.
+
+| Col | Section | | Description |
+|-----|---------|:-:|-------------|
+| T | Marker 1 Name | ✏️ | **Manual Entry** — who is marking |
+| U | Assessment Details | ✏️ | **Manual Entry** — user-selected Assessment Details (column E), or self-defined marking arrangements (e.g. `Other Casual Academic Activity (2 hours per task)`) |
+| V | Word Count | ✏️ | **Formula** — `INDEX/MATCH` pulling the matching word count from column F |
+| W | Exam | ✏️ | **Formula** — `INDEX/MATCH` pulling the matching exam duration from column G |
+| X | Group Size | ✏️ | **Formula** — `INDEX/MATCH` pulling the matching group size from column H |
+| Y | Assessment Quantity | ✏️ | **Manual Entry** — how many assessment/hours this marker handles |
+| Z | Marking Allocation | ✏️ | **Formula** — calculates hours from quantity and benchmarks (same logic as column J) |
+| AA | Email | ✏️ | Marker's email address |
+| AB | Arrangement Notes | ✏️ | Notes about the marking arrangement |
+| AC | Contract Requested | ✏️ | Dropdown: `Y` / `N` |
+
+This section is **fully customisable**. You can select only some assessments (not all), overwrite any formula in the marker blocks, or create entirely custom marking arrangements. The formulas are provided as a starting point — feel free to replace them with manual values where needed.
+
+> [!TIP]
+> If you need **more than 3 markers** for a subject, copy and paste an existing marker block to the right. The formulas will adjust automatically.
+
+### Overwriting Protected Cells
+
+The sheets are **protected** to prevent accidental changes to handbook-derived and certain formula columns. The protection allows formatting but **blocks inserting or deleting rows**.
+
+To make changes to locked cells or add/remove rows, you need to **unprotect the sheet** first:
+
+1. Go to the **Review** tab on the ribbon
+2. Click **Unprotect Sheet** (no password is required)
+3. Make your changes
+4. Re-protect the sheet when done: **Review** → **Protect Sheet** → **OK**
+
+#### When you might need to do this
+
+**Incorrectly parsed word count or group size** — The system extracts word counts and group sizes from handbook assessment descriptions using pattern matching (e.g., looking for "1500 words" or "groups of 4"). If the handbook uses unusual phrasing, the parsed value may be wrong or missing. Unprotect the sheet, correct columns F/H, and the marking hours in column J will recalculate automatically.
+
+**In-class assessment detection** — The system tries to identify in-class assessments (which don't require traditional marking) by scanning the assessment description for these keywords:
+
+`participation` · `presentation` · `attendance` · `pitch` · `online` · `ongoing` · `in class`
+
+When detected, word count and exam duration are set to `0` and the assessment quantity formula adjusts accordingly. However, because handbook descriptions are not standardised, **the system cannot catch every case**. If an assessment was incorrectly classified (or missed), unprotect the sheet and manually adjust the Assessment Quantity (column I) or Marking Hours (column J) as needed.
+
+**Adding more rows** — If you need extra rows beyond what the system generated (e.g., for additional lecturers or notes), unprotect the sheet first, then insert rows as needed.
 
 ---
 
