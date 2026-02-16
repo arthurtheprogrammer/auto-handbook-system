@@ -1,6 +1,6 @@
 # Auto Handbook System
 
-> Automated marking & admin support calculation engine for the Department of Management & Marketing, University of Melbourne.
+> Automated marking & admin support calculation system consolidation project for the Department of Management & Marketing, University of Melbourne.
 
 ## What It Does
 
@@ -19,23 +19,9 @@ This system **automatically saves 40+ hours of manual data collection per semest
 
 ```mermaid
 flowchart LR
-    subgraph Sources["📂 Data Sources &emsp; &emsp; (SharePoint)"]
+    subgraph Sources["📂 Data Sources &emsp; &emsp; &emsp; &emsp; (SharePoint)"]
         ET["Enrolment Tracker (.xlsx)"]
         TM["Teaching Matrix (.xlsx)"]
-    end
-
-    subgraph Cloud["☁️ Cloud Processing"]
-        PA["Power Automate<br>Flows"]
-        OS1["subjectListParser<br>(Office Script)"]
-        OS2["teachingStreamParser<br>(Office Script)"]
-    end
-
-    subgraph Workbook["📊 Automated Handbook Data System (.xlsm)"]
-        SL["SubjectList<br>sheet + table"]
-        TS["teaching stream<br>sheet + table"]
-        PQ["AllSubjectsHTML<br>(Power Query)"]
-        AD["assessment data parsed<br>sheet"]
-        DB["Dashboard<br>sheet"]
     end
 
     subgraph VBA["⚙️ VBA Processing"]
@@ -45,6 +31,20 @@ flowchart LR
         HQ["HTMLQuery.bas"]
         ADP["AssessmentData.bas"]
         CS["CalculationSheets.bas"]
+    end
+
+    subgraph Cloud["☁️ Cloud Processing"]
+        PA["Power Automate<br>Flows"]
+        OS1["subjectListParser<br>(Office Script)"]
+        OS2["teachingStreamParser<br>(Office Script)"]
+    end
+
+    subgraph Workbook["📊 Automated Handbook Data System (.xlsm)"]
+        DB["Dashboard<br>sheet"]
+        SL["SubjectList<br>sheet + table"]
+        TS["teaching stream<br>sheet + table"]
+        PQ["AllSubjectsHTML<br>(Power Query)"]
+        AD["assessment data parsed<br>sheet"]
     end
 
     subgraph Output["📤 Output"]
@@ -69,6 +69,9 @@ flowchart LR
     HQ --> PQ
     INT --> ADP
     ADP --> AD
+    SL --> CS
+    TS --> CS
+    AD --> CS
     INT --> CS
     CS --> FHY
     CS --> SHY
