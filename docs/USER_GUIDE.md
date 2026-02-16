@@ -287,29 +287,79 @@ These three settings need to be configured **once per computer** before first us
 <details>
 <summary><strong>1. Enable VBA Macros</strong> — required for macros and LecturerRefresh export</summary>
 
-**Windows**: File → Options → Trust Center → Trust Center Settings → Macro Settings → **Enable VBA macros** + tick **Trust access to the VBA project object model** → OK
+#### Windows
 
-**Mac**: Excel → Preferences → Security & Privacy → **Enable all macros**
+1. Open Excel
+2. Go to **File** → **Options**
+3. In the left sidebar, click **Trust Center**
+4. Click the **Trust Center Settings...** button
+5. In the left sidebar, click **Macro Settings**
+6. Select **Enable VBA macros**
+7. ✅ Also tick **Trust access to the VBA project object model** (required for the LecturerRefresh module to export into the calculation file)
+8. Click **OK** → **OK**
+
+#### Mac
+
+1. Open Excel
+2. Go to **Excel** (menu bar) → **Preferences**
+3. Click **Security & Privacy**
+4. Under **Macro Security**, select **Enable all macros**
+5. Close the preferences window
 
 </details>
 
 <details>
 <summary><strong>2. Enable External Links & Data Connections</strong> — required for enrolment numbers</summary>
 
-**Windows**: File → Options → Trust Center → Trust Center Settings → External Content → **Enable automatic update for all Workbook Links** + **Enable all Data Connections** → OK
+#### Windows
 
-**Mac**: Click **Enable Content** on the Security Warning bar, or Excel → Preferences → Security & Privacy → allow external content
+1. Open Excel
+2. Go to **File** → **Options**
+3. In the left sidebar, click **Trust Center**
+4. Click the **Trust Center Settings...** button
+5. In the left sidebar, click **External Content**
+6. Under **Security settings for Workbook Links**, select **Enable automatic update for all Workbook Links**
+7. Under **Security settings for Data Connections**, select **Enable all Data Connections**
+8. Click **OK** → **OK**
 
-> If enrolment numbers show as `0` or `#REF!`, go to **Data → Edit Links → Update Values**.
+#### Mac
+
+1. Open the workbook
+2. If you see a **Security Warning** bar at the top saying "Automatic update of links has been disabled", click **Enable Content**
+3. If prompted about data connections, click **Enable**
+4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
+
+> [!TIP]
+> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
 
 </details>
 
 <details>
 <summary><strong>3. Set Calculation Mode to Automatic</strong> — required for real-time formula updates</summary>
 
-**Windows / Mac**: Formulas tab → Calculation Options → **Automatic**
+#### Windows
 
-Or via settings: File → Options → Formulas → Workbook Calculation → **Automatic** (Windows) / Excel → Preferences → Calculation → **Automatically** (Mac)
+1. Open Excel
+2. Go to the **Formulas** tab on the ribbon
+3. Click **Calculation Options** (in the Calculation group)
+4. Select **Automatic**
+
+Or via settings:
+1. Go to **File** → **Options** → **Formulas**
+2. Under **Calculation options**, set **Workbook Calculation** to **Automatic**
+3. Click **OK**
+
+#### Mac
+
+1. Open Excel
+2. Go to the **Formulas** tab on the ribbon
+3. Click **Calculation Options**
+4. Select **Automatic**
+
+Or via preferences:
+1. Go to **Excel** → **Preferences** → **Calculation**
+2. Under **Calculation**, select **Automatically**
+3. Close the preferences window
 
 </details>
 
