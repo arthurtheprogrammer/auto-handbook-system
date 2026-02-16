@@ -11,7 +11,7 @@ A guide for team members who manage the data sources and run the system. No codi
 - [What You Need to Maintain](#what-you-need-to-maintain)
 - [Data Source Reference](#data-source-reference)
 - [Dashboard Parameters](#dashboard-parameters)
-- [Understanding the Output](#understanding-the-output)
+- [Understanding the Output](#understanding-the-output-marking--admin-support-calculations-spreadsheet)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
 - [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
