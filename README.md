@@ -19,27 +19,27 @@ This system **automatically saves 40+ hours of manual data collection per semest
 
 ```mermaid
 flowchart LR
-    subgraph Sources["📂 Data Sources (SharePoint)"]
-        ET["Enrolment Tracker\n(.xlsx)"]
-        TM["Teaching Matrix\n(.xlsx)"]
+    subgraph Sources["📂 Data Sources &emsp; &emsp; (SharePoint)"]
+        ET["Enrolment Tracker (.xlsx)"]
+        TM["Teaching Matrix (.xlsx)"]
     end
 
     subgraph Cloud["☁️ Cloud Processing"]
-        PA["Power Automate\nFlows"]
-        OS1["subjectListParser\n(Office Script)"]
-        OS2["teachingStreamParser\n(Office Script)"]
+        PA["Power Automate<br>Flows"]
+        OS1["subjectListParser<br>(Office Script)"]
+        OS2["teachingStreamParser<br>(Office Script)"]
     end
 
     subgraph Workbook["📊 Automated Handbook Data System (.xlsm)"]
-        SL["SubjectList\nsheet + table"]
-        TS["teaching stream\nsheet + table"]
-        PQ["AllSubjectsHTML\n(Power Query)"]
-        AD["assessment data parsed\nsheet"]
-        DB["Dashboard\nsheet"]
+        SL["SubjectList<br>sheet + table"]
+        TS["teaching stream<br>sheet + table"]
+        PQ["AllSubjectsHTML<br>(Power Query)"]
+        AD["assessment data parsed<br>sheet"]
+        DB["Dashboard<br>sheet"]
     end
 
     subgraph VBA["⚙️ VBA Processing"]
-        INT["Integration.bas\n(orchestrator)"]
+        INT["Integration.bas<br>(orchestrator)"]
         SLR["SubjectListRefresh.bas"]
         TSR["TeachingStreamRefresh.bas"]
         HQ["HTMLQuery.bas"]
@@ -48,9 +48,9 @@ flowchart LR
     end
 
     subgraph Output["📤 Output"]
-        FHY["FHY Calculations\nsheet"]
-        SHY["SHY Calculations\nsheet"]
-        EXP["Exported .xlsm\nwith LecturerRefresh"]
+        FHY["FHY Calculations<br>sheet"]
+        SHY["SHY Calculations<br>sheet"]
+        EXP["Exported .xlsm<br>with LecturerRefresh"]
     end
 
     ET -->|"year, filename"| PA
@@ -78,13 +78,13 @@ flowchart LR
 
 ## Key Results (OKR)
 
-| Objective | Key Result | Status |
-|-----------|-----------|--------|
-| **Automate semester workload calculations** | Reduce manual data collection from ~40 hrs → <10 min per run | ✅ Achieved |
-| **Eliminate data entry errors** | 100% of subject/assessment data sourced programmatically | ✅ Achieved |
-| **Enable mid-semester updates** | Lecturer data refreshable via one-click button in exported file | ✅ Achieved |
-| **Cross-platform compatibility** | Works on both Mac and Windows | ✅ Achieved |
-| **Self-service for team** | Non-technical users can maintain data sources and trigger runs | ✅ Achieved |
+| Objective | Key Result |
+|-----------|-----------|
+| **Automate semester workload calculations** | Reduce manual data collection from ~40 hrs → <10 min per run |
+| **Eliminate data entry errors** | 100% of subject/assessment data sourced programmatically |
+| **Enable mid-semester updates** | Lecturer data refreshable via one-click button in exported file |
+| **Cross-platform compatibility** | Works on both Mac and Windows |
+| **Self-service for team** | Non-technical users can maintain data sources and trigger runs |
 
 ## Impact
 
@@ -96,7 +96,7 @@ flowchart LR
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|-------|-----------:|
 | Data Sources | SharePoint Online (Excel files) |
 | Cloud Automation | Power Automate (HTTP-triggered flows) |
 | Data Parsing | Office Scripts (TypeScript, runs in Excel Online) |
@@ -108,26 +108,31 @@ flowchart LR
 
 ```
 auto-handbook-system/
-├── README.md                          ← You are here (project overview)
+├── README.md                              ← You are here (project overview)
+├── LICENSE
 ├── docs/
-│   ├── DEVELOPER_GUIDE.md             ← Architecture, modules, data flow, troubleshooting
-│   └── USER_GUIDE.md                  ← Data sources, maintenance, column reference
+│   ├── DEVELOPER_GUIDE.md                 ← Architecture, modules, data flow, troubleshooting
+│   └── USER_GUIDE.md                      ← Data sources, maintenance, column reference
 ├── src/
 │   ├── VBA modules/
-│   │   ├── Integration.bas            ← Main orchestrator
-│   │   ├── SubjectListRefresh.bas     ← Trigger subject list workflow
-│   │   ├── TeachingStreamRefresh.bas  ← Trigger teaching stream workflow
-│   │   ├── HTMLQuery.bas              ← Refresh & format Power Query table
-│   │   ├── AssessmentData.bas         ← Parse HTML assessment data
-│   │   ├── CalculationSheets.bas      ← Generate FHY/SHY calculation sheets
-│   │   └── LecturerRefresh.bas        ← Refresh lecturer data in exported file
+│   │   ├── Integration.bas                ← Main orchestrator
+│   │   ├── SubjectListRefresh.bas         ← Trigger subject list workflow
+│   │   ├── TeachingStreamRefresh.bas      ← Trigger teaching stream workflow
+│   │   ├── HTMLQuery.bas                  ← Refresh & format Power Query table
+│   │   ├── AssessmentData.bas             ← Parse HTML assessment data
+│   │   ├── CalculationSheets.bas          ← Generate FHY/SHY calculation sheets
+│   │   └── LecturerRefresh.bas            ← Refresh lecturer data in exported file
 │   ├── office scripts/
-│   │   ├── subjectListParser.osts     ← Parse enrolment tracker → SubjectList table
-│   │   └── teachingStreamParser.osts  ← Parse teaching matrix → teaching stream table
+│   │   ├── subjectListParser.osts         ← Parse enrolment tracker → SubjectList table
+│   │   └── teachingStreamParser.osts      ← Parse teaching matrix → teaching stream table
 │   ├── power query/
-│   │   └── AllSubjectsHTML            ← Fetch assessment HTML from handbook
-│   └── flows/
-│       └── main-flow.json             ← Power Automate flow definition (placeholder)
+│   │   └── AllSubjectsHTML                ← Fetch assessment HTML from handbook
+│   └── power automate flows/
+│       ├── WORKFLOW_RUNDOWN.md            ← Flow documentation & step-by-step walkthrough
+│       ├── subjectlist.json               ← Subject list flow definition
+│       ├── teachingstream.json            ← Teaching stream flow definition
+│       ├── subject list workflow.png      ← Flow diagram screenshot
+│       └── teaching stream workflow.png   ← Flow diagram screenshot
 └── tests/
     └── test-cases.md
 ```
