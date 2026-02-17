@@ -1,13 +1,21 @@
-'==============================================================================
-' TEACHING STREAM REFRESH MODULE
-' Purpose: Trigger Power Automate workflow to refresh the teaching stream
-'          data from the Teaching Matrix SharePoint file
-'==============================================================================
+'===============================================================
+' Module: TeachingStreamRefresh
+' Purpose: Trigger a Power Automate workflow to refresh teaching
+'          stream data from the Teaching Matrix on SharePoint
+' Main Entry: RefreshTeachingStream() - standalone or via Integration
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - Dashboard sheet (year, teaching matrix filename, email)
+'   - Integration.bas (EscapeJSON, GetOptionalValue,
+'     SendRequestMac/Windows)
+'===============================================================
 
-'------------------------------------------------------------------------------
-' STANDALONE ENTRY POINT - RefreshTeachingStream
-' Can be run independently from the VBA editor or a button
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' RefreshTeachingStream
+' Purpose: Validate inputs and trigger the teaching stream
+'          workflow as a standalone action
+'---------------------------------------------------------------
 Sub RefreshTeachingStream()
     Dim ws As Worksheet
     Dim yearValue As String
@@ -38,10 +46,12 @@ Sub RefreshTeachingStream()
     MsgBox "Teaching Stream Refresh workflow triggered successfully!", vbInformation
 End Sub
 
-'------------------------------------------------------------------------------
-' TRIGGER TEACHING STREAM WORKFLOW
-' Called by Integration.bas or standalone via RefreshTeachingStream
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' TriggerTeachingStreamWorkflow
+' Purpose: Build JSON payload and send HTTP POST to the
+'          teaching stream Power Automate workflow
+' Called by: Integration.GenerateMarkingSupport, RefreshTeachingStream
+'---------------------------------------------------------------
 Sub TriggerTeachingStreamWorkflow(ws As Worksheet, yearValue As String, teachingMatrix As String, emailValue As String)
     Dim url As String
     Dim jsonData As String

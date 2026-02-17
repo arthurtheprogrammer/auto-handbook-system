@@ -1,13 +1,21 @@
-'==============================================================================
-' SUBJECT LIST REFRESH MODULE
-' Purpose: Trigger Power Automate workflow to refresh the subject list
-'          from the Enrolment Tracker SharePoint file
-'==============================================================================
+'===============================================================
+' Module: SubjectListRefresh
+' Purpose: Trigger a Power Automate workflow to refresh the
+'          subject list from the Enrolment Tracker on SharePoint
+' Main Entry: RefreshSubjectList() - standalone or via Integration
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - Dashboard sheet (year, enrolment tracker filename, email)
+'   - Integration.bas (EscapeJSON, GetOptionalValue,
+'     SendRequestMac/Windows)
+'===============================================================
 
-'------------------------------------------------------------------------------
-' STANDALONE ENTRY POINT - RefreshSubjectList
-' Can be run independently from the VBA editor or a button
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' RefreshSubjectList
+' Purpose: Validate inputs and trigger the subject list workflow
+'          as a standalone action from the VBA editor or a button
+'---------------------------------------------------------------
 Sub RefreshSubjectList()
     Dim ws As Worksheet
     Dim yearValue As String
@@ -38,10 +46,12 @@ Sub RefreshSubjectList()
     MsgBox "Subject List Refresh workflow triggered successfully!", vbInformation
 End Sub
 
-'------------------------------------------------------------------------------
-' TRIGGER SUBJECT LIST WORKFLOW
-' Called by Integration.bas or standalone via RefreshSubjectList
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' TriggerSubjectListWorkflow
+' Purpose: Build JSON payload and send HTTP POST to the
+'          subject list Power Automate endpoint
+' Called by: Integration.GenerateMarkingSupport, RefreshSubjectList
+'---------------------------------------------------------------
 Sub TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolmentTracker As String, emailValue As String)
     Dim url As String
     Dim jsonData As String

@@ -1,13 +1,39 @@
+'===============================================================
+' Module: CalculationSheets
+' Purpose: Generate FHY/SHY marking support calculation sheets
+'          from subject, assessment, and teaching stream data
+' Main Entry: GenerateCalculationSheets() - called by Integration.bas
+' Output: Exported .xlsm workbook saved to SharePoint with
+'         per-subject assessment blocks, lecturer rows, and formulas
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - SubjectList sheet (subject_list table)
+'   - assessment data parsed sheet
+'   - teaching stream sheet
+'   - Dashboard sheet (year, benchmarks, file paths)
+'   - Enrolment Tracker on SharePoint (external link formulas)
+'===============================================================
 Option Explicit
 
-' ===== CONFIGURATION =====
+'===============================================================
+' SECTION 1: CONFIGURATION & LOGGING
+'===============================================================
+
 Public Const ENABLE_REALTIME_LOG As Boolean = True
 Public Const LOG_TO_STATUSBAR As Boolean = True
 
-' ===== LOGGING SETUP =====
 Dim wsLog As Worksheet
 Private Const ENROLMENT_TRACKER_BASE As String = "https://unimelbcloud.sharepoint.com/teams/DepartmentofManagementMarketing-DepartmentOperations/Shared Documents/TEACHING MATRIX & ENROLMENT TRACKER/"
 
+'---------------------------------------------------------------
+' InitializeProcessLog
+' Purpose: Create a fresh "Process Log" sheet to capture all
+'          status messages during generation
+' Called by: GenerateCalculationSheets
+' Inputs:
+'   - wb: the workbook to add the log sheet to
+'---------------------------------------------------------------
 Sub InitializeProcessLog(wb As Workbook)
     Dim tempLog As Worksheet
     Dim existingLog As Worksheet
@@ -87,6 +113,14 @@ ErrorHandler:
     End
 End Sub
 
+'---------------------------------------------------------------
+' LogMessage
+' Purpose: Write a timestamped entry to the Process Log sheet
+' Called by: Nearly every function in this module
+' Inputs:
+'   - msg: the message text
+'   - elapsed (optional): seconds elapsed for performance logging
+'---------------------------------------------------------------
 Sub LogMessage(msg As String, Optional elapsedTime As Double = -1)
     ' Always write to Debug first (never fails)
     Debug.Print msg
@@ -123,6 +157,13 @@ Sub LogMessage(msg As String, Optional elapsedTime As Double = -1)
     On Error GoTo 0
 End Sub
 
+'---------------------------------------------------------------
+' VerifyRequiredSheets
+' Purpose: Confirm that all prerequisite sheets exist before
+'          generation begins
+' Called by: GenerateCalculationSheets
+' Returns: True if all required sheets are present
+'---------------------------------------------------------------
 Function VerifyRequiredSheets(wb As Workbook) As Boolean
     Dim requiredSheets As Variant
     requiredSheets = Array("Dashboard", "SubjectList", "assessment data parsed", "teaching stream")
@@ -162,7 +203,13 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
     End If
 End Function
 
-' ===== HELPER FUNCTIONS =====
+'---------------------------------------------------------------
+' SafeArrayIndex
+' Purpose: Safely retrieve a field from a data array by position
+'          index (e.g. subject arrays: 0=UID, 1=subject code, 2=subject name,
+'          3=study period, 4=grouped period).
+'          Returns a default value if the index is out of range.
+'---------------------------------------------------------------
 Function SafeArrayIndex(arr As Variant, idx As Integer, defaultVal As Variant) As Variant
     On Error Resume Next
     SafeArrayIndex = arr(idx)
@@ -170,6 +217,16 @@ Function SafeArrayIndex(arr As Variant, idx As Integer, defaultVal As Variant) A
     On Error GoTo 0
 End Function
 
+'===============================================================
+' SECTION 2: MAIN WORKFLOW
+'===============================================================
+
+'---------------------------------------------------------------
+' GenerateCalculationSheets
+' Purpose: Main entry point — generates FHY and SHY calculation
+'          sheets, then exports them to a new workbook on SharePoint
+' Called by: Integration.RunAllMacros
+'---------------------------------------------------------------
 Sub GenerateCalculationSheets()
     Dim wb As Workbook
     Set wb = ThisWorkbook
@@ -328,6 +385,13 @@ ErrorHandler:
     On Error GoTo 0
 End Sub
 
+'---------------------------------------------------------------
+' ExportCalculationSheets
+' Purpose: Copy FHY/SHY sheets into a new workbook, attach the
+'          LecturerRefresh VBA module, and save to SharePoint
+' Called by: GenerateCalculationSheets
+' Returns: True on successful export
+'---------------------------------------------------------------
 Function ExportCalculationSheets(wb As Workbook) As Boolean
     On Error GoTo ErrorHandler
     
@@ -548,6 +612,13 @@ ErrorHandler:
 End Function
 
 
+'---------------------------------------------------------------
+' GetUniqueFilename
+' Purpose: Generate a unique filename by appending a timestamp
+'          if the target path already exists
+' Called by: ExportCalculationSheets
+' Returns: A file path guaranteed not to conflict
+'---------------------------------------------------------------
 Function GetUniqueFilename(basePath As String, baseName As String, ext As String) As String
     On Error GoTo ErrorHandler
     
@@ -587,6 +658,13 @@ ErrorHandler:
     On Error GoTo 0
 End Function
 
+'---------------------------------------------------------------
+' GetBenchmarkValue
+' Purpose: Read a benchmark number from a Dashboard cell,
+'          falling back to a default if the cell is empty/invalid
+' Called by: GenerateCalculationSheets
+' Returns: The benchmark value (e.g. word count per hour)
+'---------------------------------------------------------------
 Function GetBenchmarkValue(wb As Workbook, sheetName As String, cellRef As String, defaultValue As Double) As Double
     On Error GoTo ErrorHandler
     
@@ -615,6 +693,13 @@ ErrorHandler:
     GetBenchmarkValue = defaultValue
 End Function
 
+'---------------------------------------------------------------
+' GenerateSheet
+' Purpose: Create a single calculation sheet (FHY or SHY),
+'          populate it with subject data, and apply formatting
+' Called by: GenerateCalculationSheets
+' Returns: True on success
+'---------------------------------------------------------------
 Function GenerateSheet(wb As Workbook, groupedPeriod As String, wordBench As Double, examBench As Double, markingSupportBench As Double) As Boolean
     On Error GoTo ErrorHandler
     
@@ -716,6 +801,11 @@ ErrorHandler:
     GenerateSheet = False
 End Function
 
+'---------------------------------------------------------------
+' CreateHeaders
+' Purpose: Write the column header row (A–S) for a calculation sheet
+' Called by: GenerateSheet
+'---------------------------------------------------------------
 Sub CreateHeaders(ws As Worksheet)
     On Error GoTo ErrorHandler
     
@@ -744,7 +834,18 @@ ErrorHandler:
     LogMessage "ERROR in CreateHeaders: " & Err.description
 End Sub
 
+'===============================================================
+' SECTION 3: DATA RETRIEVAL
+'===============================================================
 
+'---------------------------------------------------------------
+' GetFilteredSubjectsWithAssessments
+' Purpose: Build a collection of active subjects for a given
+'          grouped period (FHY or SHY), excluding flagged entries
+' Called by: GenerateSheet
+' Returns: Collection of subject arrays (UID, code, name,
+'          study period, grouped period, row index)
+'---------------------------------------------------------------
 Function GetFilteredSubjectsWithAssessments(wb As Workbook, groupedPeriod As String) As Collection
     On Error GoTo ErrorHandler
     
@@ -862,6 +963,17 @@ ErrorHandler:
     Set GetFilteredSubjectsWithAssessments = Nothing
 End Function
 
+'===============================================================
+' SECTION 4: SHEET POPULATION
+'===============================================================
+
+'---------------------------------------------------------------
+' PopulateSheetData
+' Purpose: Populate a calculation sheet with all subject blocks,
+'          organised by study period (Summer/Sem 1 or Winter/Sem 2)
+' Called by: GenerateSheet
+' Returns: True on success
+'---------------------------------------------------------------
 Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As Collection, wordBench As Double, examBench As Double, markingSupportBench As Double) As Boolean
     On Error GoTo ErrorHandler
     
@@ -954,6 +1066,12 @@ ErrorHandler:
     PopulateSheetData = False
 End Function
 
+'---------------------------------------------------------------
+' ProcessSubjectCollection
+' Purpose: Iterate over a collection of subjects for one study
+'          period category and write each subject block to the sheet
+' Called by: PopulateSheetData
+'---------------------------------------------------------------
 Sub ProcessSubjectCollection(wb As Workbook, wsOutput As Worksheet, subjects As Collection, _
     ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, _
     markerFormulaQueue As Collection, headerText As String, categoryName As String)
@@ -979,6 +1097,13 @@ Sub ProcessSubjectCollection(wb As Workbook, wsOutput As Worksheet, subjects As 
 End Sub
 
 
+'---------------------------------------------------------------
+' ProcessSubject
+' Purpose: Write a single subject block (header row, assessment
+'          rows, lecturer rows, formulas, and marker blocks)
+' Called by: ProcessSubjectCollection
+' Returns: True on success
+'---------------------------------------------------------------
 Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, ByRef markerFormulaQueue As Collection) As Boolean
     On Error GoTo ErrorHandler
     
@@ -1150,12 +1275,22 @@ ErrorHandler:
     ProcessSubject = False
 End Function
 
-' Helper function to build assessment quantity formula
+'---------------------------------------------------------------
+' BuildAssessmentQuantityFormula
+' Purpose: Build a VLOOKUP formula to pull assessment quantity
+'          (percentage/timing) from the assessment data sheet
+'---------------------------------------------------------------
 Function BuildAssessmentQuantityFormula(rowNum As Long, assessUID As String, subjectCode As String, studyPeriod As String) As String
     ' This builds the VLOOKUP formula for assessment quantity
     BuildAssessmentQuantityFormula = "=IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""" & studyPeriod & """)),9,FALSE),IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""All"")),9,FALSE),""""))"
 End Function
 
+'---------------------------------------------------------------
+' SetContractDropdown
+' Purpose: Add a Y/N data validation dropdown to the "Contract
+'          Requested" column in a marker block
+' Called by: ProcessSubject
+'---------------------------------------------------------------
 Sub SetContractDropdown(wsOutput As Worksheet, subjectStartRow As Long, markerNum As Integer)
     On Error GoTo ErrorHandler
     
@@ -1208,6 +1343,12 @@ ErrorHandler:
     LogMessage "ERROR in SetContractDropdown: " & Err.description
 End Sub
 
+'---------------------------------------------------------------
+' SetMarkerBlockFormulas
+' Purpose: Write word count, exam, group size, quantity, and
+'          allocation formulas for one marker block
+' Called by: ProcessSubject (via markerFormulaQueue)
+'---------------------------------------------------------------
 Sub SetMarkerBlockFormulas(wsOutput As Worksheet, subjectStartRow As Long, subjectEndRow As Long, _
     markerNum As Integer, subjectCode As String, studyPeriod As String)
     
@@ -1302,10 +1443,22 @@ ErrorHandler:
     LogMessage "ERROR in SetMarkerBlockFormulas: " & Err.description
 End Sub
 
+'---------------------------------------------------------------
+' ColLetter
+' Purpose: Convert a column number to its letter equivalent
+'---------------------------------------------------------------
 Function ColLetter(colNum As Integer) As String
     ColLetter = Split(Cells(1, colNum).Address, "$")(1)
 End Function
 
+'---------------------------------------------------------------
+' GetAssessmentsForSubject
+' Purpose: Retrieve all assessments for a subject/study period,
+'          using a cached array for performance
+'          Falls back to "All" study period if no exact match
+' Called by: ProcessSubject
+' Returns: Collection of assessment arrays
+'---------------------------------------------------------------
 Function GetAssessmentsForSubject(wsAssessment As Worksheet, subjectCode As String, studyPeriod As String) As Collection
     On Error GoTo ErrorHandler
     
@@ -1391,6 +1544,13 @@ ErrorHandler:
     Set GetAssessmentsForSubject = Nothing
 End Function
 
+'---------------------------------------------------------------
+' GetLecturersForSubjectFlexible
+' Purpose: Find lecturers for a subject, trying multiple study
+'          period name variations (e.g. "Summer" vs "Summer Term")
+' Called by: ProcessSubject
+' Returns: Collection of lecturer arrays (name, status, stream, activity)
+'---------------------------------------------------------------
 Function GetLecturersForSubjectFlexible(wb As Workbook, subjectCode As String, studyPeriod As String) As Collection
     On Error GoTo ErrorHandler
     
@@ -1498,6 +1658,12 @@ ErrorHandler:
     Set GetLecturersForSubjectFlexible = Nothing
 End Function
 
+'---------------------------------------------------------------
+' PopulateLecturerData
+' Purpose: Write lecturer names, statuses, and formulas (cols L-R)
+'          into the subject block
+' Called by: ProcessSubject
+'---------------------------------------------------------------
 Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRow As Long, totalRow As Long, markingSupportBench As Double)
     On Error GoTo ErrorHandler
     
@@ -1552,6 +1718,12 @@ ErrorHandler:
     LogMessage "ERROR in PopulateLecturerData: " & Err.description & " (Error " & Err.Number & ")"
 End Sub
 
+'---------------------------------------------------------------
+' SetAssessmentQuantityFormula
+' Purpose: Write the assessment quantity formula (col I) and
+'          in-class location value (col E) for one assessment row
+' Called by: ProcessSubject
+'---------------------------------------------------------------
 Sub SetAssessmentQuantityFormula(wsOutput As Worksheet, currentRow As Long, originalUID As String, subjectCode As String, studyPeriod As String, wsAssessment As Worksheet)
     On Error GoTo ErrorHandler
     
@@ -1585,6 +1757,12 @@ ErrorHandler:
     LogMessage "ERROR in SetAssessmentQuantityFormula: " & Err.description & " (Error " & Err.Number & ")"
 End Sub
 
+'---------------------------------------------------------------
+' SetMarkingHoursFormula
+' Purpose: Write the marking hours formula (col J) which calculates
+'          hours based on word count or exam benchmarks
+' Called by: ProcessSubject
+'---------------------------------------------------------------
 Sub SetMarkingHoursFormula(wsOutput As Worksheet, currentRow As Long)
     On Error GoTo ErrorHandler
     
@@ -1604,6 +1782,11 @@ ErrorHandler:
     LogMessage "ERROR in SetMarkingHoursFormula: " & Err.description & " (Error " & Err.Number & ")"
 End Sub
 
+'---------------------------------------------------------------
+' CategorizeStudyPeriod
+' Purpose: Map a study period name to its display category
+'          (Summer, Semester 1, Winter, or Semester 2)
+'---------------------------------------------------------------
 Function CategorizeStudyPeriod(studyPeriod As String, groupedPeriod As String) As String
     Dim sp As String
     sp = LCase(studyPeriod)
@@ -1635,6 +1818,15 @@ Function CategorizeStudyPeriod(studyPeriod As String, groupedPeriod As String) A
     End If
 End Function
 
+'===============================================================
+' SECTION 5: FORMATTING & UTILITIES
+'===============================================================
+
+'---------------------------------------------------------------
+' FindColumn
+' Purpose: Locate a column by header name in row 1
+' Returns: Column number, or 0 if not found
+'---------------------------------------------------------------
 Function FindColumn(ws As Worksheet, headerName As String) As Integer
     On Error GoTo ErrorHandler
     
@@ -1670,6 +1862,12 @@ ErrorHandler:
     FindColumn = 0
 End Function
 
+'---------------------------------------------------------------
+' FindEnrolmentCell
+' Purpose: Find the cell address of a subject's enrolment value
+'          in the output sheet (matched by subject code + study period)
+' Returns: Cell address string, or empty if not found
+'---------------------------------------------------------------
 Function FindEnrolmentCell(wsOutput As Worksheet, subjectCode As String, studyPeriod As String) As String
     On Error GoTo ErrorHandler
     
@@ -1698,6 +1896,13 @@ ErrorHandler:
     FindEnrolmentCell = ""
 End Function
 
+'---------------------------------------------------------------
+' FormatSheet
+' Purpose: Apply all formatting to a completed calculation sheet:
+'          column widths, number formats, alignment, locking,
+'          conditional formatting, marker block styling, protection
+' Called by: GenerateSheet
+'---------------------------------------------------------------
 Sub FormatSheet(ws As Worksheet)
     On Error GoTo ErrorHandler
     
@@ -1771,7 +1976,7 @@ Sub FormatSheet(ws As Worksheet)
     ws.Cells.Locked = False
     
     Dim lockedCols As Variant
-    lockedCols = Array("A:J", "Q:R")
+    lockedCols = Array("A:H", "J:J", "Q:R")
     
     For i = LBound(lockedCols) To UBound(lockedCols)
         ws.Columns(lockedCols(i)).Locked = True
@@ -1861,6 +2066,10 @@ ErrorHandler:
     LogMessage "ERROR in FormatSheet: " & Err.description & " (Error " & Err.Number & ")"
 End Sub
 
+'---------------------------------------------------------------
+' CollectionKeyExists
+' Purpose: Check whether a key already exists in a VBA Collection
+'---------------------------------------------------------------
 Function CollectionKeyExists(col As Collection, key As String) As Boolean
     On Error Resume Next
     Dim temp As Variant
@@ -1870,6 +2079,11 @@ Function CollectionKeyExists(col As Collection, key As String) As Boolean
     On Error GoTo 0
 End Function
 
+'---------------------------------------------------------------
+' HasErrorsInLog
+' Purpose: Scan the Process Log for ERROR/CRITICAL/FAILED entries
+' Returns: True if any errors were logged
+'---------------------------------------------------------------
 Function HasErrorsInLog() As Boolean
     On Error Resume Next
     HasErrorsInLog = False
@@ -1897,6 +2111,12 @@ Function HasErrorsInLog() As Boolean
     On Error GoTo 0
 End Function
 
+'---------------------------------------------------------------
+' CleanupPartialSheets
+' Purpose: Delete partially generated FHY/SHY sheets after an
+'          error to avoid leaving inconsistent state
+' Called by: GenerateCalculationSheets (error handler)
+'---------------------------------------------------------------
 Sub CleanupPartialSheets(wb As Workbook)
     On Error Resume Next
     
@@ -1925,6 +2145,14 @@ Sub CleanupPartialSheets(wb As Workbook)
     On Error GoTo 0
 End Sub
 
+'---------------------------------------------------------------
+' CopyVBAModuleIfExists
+' Purpose: Copy the LecturerRefresh VBA module from the source
+'          workbook into the exported workbook so the Refresh
+'          button works standalone
+' Called by: ExportCalculationSheets
+' Returns: True if the module was successfully copied
+'---------------------------------------------------------------
 Function CopyVBAModuleIfExists(sourceWB As Workbook, targetWB As Workbook, moduleName As String) As Boolean
     On Error GoTo ErrorHandler
     
@@ -1978,10 +2206,12 @@ ErrorHandler:
     CopyVBAModuleIfExists = False
 End Function
 
-' ============================================================================
-' ADD REFRESH BUTTONS - Simple version
-' Just adds button at L2 on each calculation sheet
-' ============================================================================
+'---------------------------------------------------------------
+' AddRefreshButtonsToSheets
+' Purpose: Add a "Refresh Lecturer Data" button at cell L2 on
+'          each calculation sheet in the exported workbook
+' Called by: ExportCalculationSheets
+'---------------------------------------------------------------
 
 Sub AddRefreshButtonsToSheets(wb As Workbook)
     On Error GoTo ErrorHandler

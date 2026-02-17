@@ -1,3 +1,22 @@
+'===============================================================
+' Module: AssessmentData
+' Purpose: Parse handbook HTML to extract assessment details
+'          (descriptions, word counts, exam durations, group sizes)
+'          and write structured data to the assessment data sheet
+' Main Entry: ParseAssessmentData() - called by Integration.RunAllMacros
+' Output: Populated "assessment data parsed" sheet with one row
+'         per assessment per subject per study period
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - AllSubjectsHTML sheet (HTML content from Power Query)
+'   - HTMLQuery.bas (must run first to refresh HTML data)
+'===============================================================
+
+'===============================================================
+' SECTION 1: MAIN ENTRY & SETUP
+'===============================================================
+
 ' Custom type to hold study period data - must be at module level
 Type StudyPeriodData
     periodName As String
@@ -5,6 +24,13 @@ Type StudyPeriodData
     assessmentCount As Integer
 End Type
 
+'---------------------------------------------------------------
+' ParseAssessmentData
+' Purpose: Main entry point — reads HTML from AllSubjectsHTML,
+'          parses each subject's assessment table, and writes
+'          the results to the target sheet
+' Called by: Integration.RunAllMacros
+'---------------------------------------------------------------
 ' Main parsing subroutine
 Sub ParseAssessmentData()
     Dim wsSource As Worksheet
@@ -53,6 +79,11 @@ Sub ParseAssessmentData()
     If Not SilentMode Then MsgBox "Assessment data parsing completed! " & (currentRow - 2) & " records processed."
 End Sub
 
+'---------------------------------------------------------------
+' SetupHeaders
+' Purpose: Write column headers (A–J) on the target sheet
+' Called by: ParseAssessmentData
+'---------------------------------------------------------------
 Sub SetupHeaders(wsTarget As Worksheet)
     With wsTarget
         .Cells(1, 1).Value = "UID"
@@ -68,6 +99,12 @@ Sub SetupHeaders(wsTarget As Worksheet)
     End With
 End Sub
 
+'---------------------------------------------------------------
+' FormatOutput
+' Purpose: Apply column widths, row heights, and bold headers
+'          to the finished assessment data sheet
+' Called by: ParseAssessmentData
+'---------------------------------------------------------------
 Sub FormatOutput(wsTarget As Worksheet, currentRow As Long)
     With wsTarget
         ' Auto-fit all columns first
@@ -103,6 +140,15 @@ Sub FormatOutput(wsTarget As Worksheet, currentRow As Long)
     End With
 End Sub
 
+'===============================================================
+' SECTION 2: HTML PARSING
+'===============================================================
+
+'---------------------------------------------------------------
+' ProcessSubjectHTML
+' Purpose: Parse one subject's HTML content into assessment rows
+' Called by: ParseAssessmentData
+'---------------------------------------------------------------
 Sub ProcessSubjectHTML(subjectCode As String, htmlContent As String, wsTarget As Worksheet, ByRef currentRow As Long)
     Dim studyPeriods() As StudyPeriodData
     Dim periodCount As Integer
@@ -128,6 +174,12 @@ Sub ProcessSubjectHTML(subjectCode As String, htmlContent As String, wsTarget As
     Next i
 End Sub
 
+'---------------------------------------------------------------
+' ExtractStudyPeriods
+' Purpose: Split HTML content by <h3> headers into separate
+'          study period sections, or assign "All" if no headers
+' Called by: ProcessSubjectHTML
+'---------------------------------------------------------------
 Sub ExtractStudyPeriods(htmlContent As String, ByRef studyPeriods() As StudyPeriodData, ByRef periodCount As Integer)
     Dim h3StartPos As Long
     Dim h3EndPos As Long
@@ -201,6 +253,12 @@ Sub ExtractStudyPeriods(htmlContent As String, ByRef studyPeriods() As StudyPeri
     End If
 End Sub
 
+'---------------------------------------------------------------
+' ExtractAssessmentsFromSection
+' Purpose: Find all <tr> rows within a section of HTML and
+'          extract the raw assessment text from each row
+' Called by: ExtractStudyPeriods
+'---------------------------------------------------------------
 Sub ExtractAssessmentsFromSection(sectionContent As String, ByRef assessments() As String, ByRef assessmentCount As Integer)
     Dim startPos As Long
     Dim endPos As Long
@@ -242,6 +300,16 @@ Sub ExtractAssessmentsFromSection(sectionContent As String, ByRef assessments() 
     End If
 End Sub
 
+'===============================================================
+' SECTION 3: DATA EXTRACTION
+'===============================================================
+
+'---------------------------------------------------------------
+' ProcessAssessmentRow
+' Purpose: Parse a single assessment HTML row into structured
+'          fields and write them to the target sheet
+' Called by: ProcessSubjectHTML
+'---------------------------------------------------------------
 Sub ProcessAssessmentRow(subjectCode As String, studyPeriod As String, assessmentCount As Integer, rowContent As String, wsTarget As Worksheet, currentRow As Long)
     Dim uid As String
     Dim description As String
@@ -281,6 +349,12 @@ Sub ProcessAssessmentRow(subjectCode As String, studyPeriod As String, assessmen
     Call WriteAssessmentData(wsTarget, currentRow, uid, subjectCode, studyPeriod, description, wordCount, examDuration, groupSize, isInClassAssessment, timing, percentage)
 End Sub
 
+'---------------------------------------------------------------
+' CheckIfInClass
+' Purpose: Determine if an assessment is in-class based on
+'          keyword matching against the description
+' Returns: True if any keyword is found
+'---------------------------------------------------------------
 Function CheckIfInClass(description As String) As Boolean
     Dim lowerDesc As String
     lowerDesc = LCase(description)
@@ -294,6 +368,11 @@ Function CheckIfInClass(description As String) As Boolean
                      (InStr(1, lowerDesc, "in class") > 0)
 End Function
 
+'---------------------------------------------------------------
+' WriteAssessmentData
+' Purpose: Write a single parsed assessment row to the target sheet
+' Called by: ProcessAssessmentRow
+'---------------------------------------------------------------
 Sub WriteAssessmentData(wsTarget As Worksheet, currentRow As Long, uid As String, subjectCode As String, studyPeriod As String, description As String, wordCount As Long, examDuration As Integer, groupSize As Integer, isInClass As Boolean, timing As String, percentage As String)
     With wsTarget
         .Cells(currentRow, 1).Value = uid
@@ -315,6 +394,16 @@ Sub WriteAssessmentData(wsTarget As Worksheet, currentRow As Long, uid As String
     End With
 End Sub
 
+'===============================================================
+' SECTION 4: EXTRACTION HELPERS
+'===============================================================
+
+'---------------------------------------------------------------
+' ExtractDescription
+' Purpose: Pull the assessment description text from the first
+'          <td> cell of an HTML table row
+' Returns: Cleaned plain-text description
+'---------------------------------------------------------------
 Function ExtractDescription(rowContent As String) As String
     Dim startPos As Long
     Dim endPos As Long
@@ -333,6 +422,11 @@ Function ExtractDescription(rowContent As String) As String
     End If
 End Function
 
+'---------------------------------------------------------------
+' ExtractTiming
+' Purpose: Pull the timing value from the second <td> cell
+' Returns: Cleaned timing text (e.g. "During the teaching period")
+'---------------------------------------------------------------
 Function ExtractTiming(rowContent As String) As String
     Dim tdCount As Integer
     Dim pos As Long
@@ -366,6 +460,11 @@ Function ExtractTiming(rowContent As String) As String
     Loop
 End Function
 
+'---------------------------------------------------------------
+' ExtractPercentage
+' Purpose: Pull the percentage value from the third <td> cell
+' Returns: Cleaned percentage text (e.g. "30%")
+'---------------------------------------------------------------
 Function ExtractPercentage(rowContent As String) As String
     Dim tdCount As Integer
     Dim pos As Long
@@ -399,6 +498,12 @@ Function ExtractPercentage(rowContent As String) As String
     Loop
 End Function
 
+'---------------------------------------------------------------
+' CleanHTMLContent
+' Purpose: Strip HTML tags, convert <br>/<p> to spaces, and
+'          collapse multiple whitespace into single spaces
+' Returns: Plain text string
+'---------------------------------------------------------------
 Function CleanHTMLContent(htmlText As String) As String
     Dim result As String
     Dim i As Long
@@ -440,6 +545,12 @@ Function CleanHTMLContent(htmlText As String) As String
     CleanHTMLContent = result
 End Function
 
+'---------------------------------------------------------------
+' ExtractWordCount
+' Purpose: Find the rightmost occurrence of "words" in the HTML
+'          and extract the preceding number
+' Returns: Word count (Long), or 0 if not found
+'---------------------------------------------------------------
 Function ExtractWordCount(rowContent As String) As Long
     Dim wordPos As Long
     Dim pos As Long
@@ -478,6 +589,13 @@ Function ExtractWordCount(rowContent As String) As Long
     End If
 End Function
 
+'---------------------------------------------------------------
+' ExtractExamDuration
+' Purpose: Find "exam" keyword, then look for "N hours" nearby.
+'          Defaults to 2 hours if exam is mentioned without a
+'          specific duration
+' Returns: Duration in hours (Integer), or 0 if no exam
+'---------------------------------------------------------------
 Function ExtractExamDuration(description As String) As Integer
     Dim examPos As Long
     Dim hoursPos As Long
@@ -523,6 +641,12 @@ Function ExtractExamDuration(description As String) As Integer
     End If
 End Function
 
+'---------------------------------------------------------------
+' ExtractGroupSize
+' Purpose: Find "groups of N" pattern and extract group size.
+'          Handles ranges (e.g. "3-5") by averaging
+' Returns: Group size (Integer), or 0 if no group work
+'---------------------------------------------------------------
 Function ExtractGroupSize(description As String) As Integer
     Dim groupsOfPos As Long
     Dim pos As Long

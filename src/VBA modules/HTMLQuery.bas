@@ -1,3 +1,24 @@
+'===============================================================
+' Module: HTMLQuery
+' Purpose: Refresh the Power Query connection that pulls handbook
+'          HTML for all subjects, then format the results table
+' Main Entry: GenerateSubjectQueries() - called by Integration.RunAllMacros
+' Output: Refreshed and formatted AllSubjectsHTML table with
+'         live hyperlinks and status column
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - AllSubjectsHTML sheet and table (Power Query connection)
+'   - Power Query definition in workbook (Windows only)
+'===============================================================
+
+'---------------------------------------------------------------
+' GenerateSubjectQueries
+' Purpose: Refresh the Power Query connection to pull fresh
+'          handbook HTML. On Mac, skips the refresh and uses
+'          existing data. Reports success/failure counts.
+' Called by: Integration.RunAllMacros
+'---------------------------------------------------------------
 Sub GenerateSubjectQueries()
     Dim wb As Workbook
     Dim ws As Worksheet
@@ -121,6 +142,13 @@ Sub GenerateSubjectQueries()
 End Sub
 
 
+'---------------------------------------------------------------
+' FormatTableCleanup
+' Purpose: Apply consistent formatting to the AllSubjectsHTML
+'          table: row heights, column widths, hyperlinks,
+'          date formats, header styling, and freeze panes
+' Called by: GenerateSubjectQueries
+'---------------------------------------------------------------
 Sub FormatTableCleanup(ws As Worksheet, Optional tbl As ListObject = Nothing)
     ' Clean up table formatting: standard row heights, no text wrap, autofit columns
     ' Similar to Office Script reset formatting functionality

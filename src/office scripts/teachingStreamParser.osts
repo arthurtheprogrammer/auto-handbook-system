@@ -1,3 +1,18 @@
+/**
+ * Script:  teachingStreamParser
+ * Purpose: Parse lecturer stream assignments and employment statuses
+ *          from Power Automate, aggregate by subject/period/lecturer,
+ *          and write to the teaching_stream table
+ * Trigger: Power Automate Workflow 3 (Teaching Matrix Processing)
+ * Output:  Populated teaching_stream table on "teaching stream" sheet,
+ *          progress_bar status updated on Dashboard
+ * Author:  Arthur Chen
+ * Repo:    github.com/arthurtheprogrammer/auto-handbook-system
+ *
+ * @param workbook           - Active workbook reference
+ * @param lecturerStreamJson - Array of stream assignment records from Teaching Matrix (`Teaching Data` ws)
+ * @param lecturerStatusJson - Array of staff status records from Teaching Matrix (`Staff` ws)
+ */
 function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lecturerStatusJson: object) {
   // Define interface with index signature for flexible key matching
   interface AssignmentEntry {

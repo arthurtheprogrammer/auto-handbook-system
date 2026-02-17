@@ -1,24 +1,25 @@
-'=============================================================================
-' MODULE: LecturerRefresh
-' PURPOSE: Trigger Power Automate Workflow to refresh data from Teaching Matrix, wait for completion, refresh lecturer data in Marking Support
-' LOCATION: Exported calculation sheets only (e.g., 2026 Marking & Admin Support Calculations.xlsm)
-'
-' WORKFLOW:
-'   1. User clicks Refresh button
-'   2. Read parameters from source file (year, teaching matrix filename, email)
-'   3. Trigger Workflow 3 (Teaching Matrix Processing)
-'   4. Poll Dashboard F5 cell every 3 seconds until "DONE" (max 2 minutes)
-'   5. Load fresh teaching stream data from source
-'   6. Update lecturer columns (L-O) with fresh data ONLY
-'   7. Preserve user edits in columns P (Stream Enrolment) and S (Notes)
-'   8. Add rows before Total if needed (no orphan tracking)
-'=============================================================================
+'===============================================================
+' Module: LecturerRefresh
+' Purpose: Refresh lecturer data in exported calculation sheets
+'          by triggering Workflow 3 (Teaching Matrix Processing),
+'          then updating columns L-O with fresh data while
+'          preserving user edits in columns P and S
+' Main Entry: RefreshLecturerData() - triggered by Refresh button
+' Output: Updated lecturer names, statuses, streams, activity
+'         codes in FHY/SHY sheets; user notes preserved
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - Source file: Automated Handbook Data System.xlsm (SharePoint)
+'   - teaching stream sheet in source file
+'   - Workflow 3 Power Automate endpoint
+'===============================================================
 
 Option Explicit
 
-'------------------------------------------------------------------------------
-' CONSTANTS - HARDCODED PATHS
-'------------------------------------------------------------------------------
+'===============================================================
+' SECTION 1: CONFIGURATION
+'===============================================================
 ' Source file path (Automated Handbook Data System)
 Private Const SOURCE_FILE_PATH As String = "https://unimelbcloud.sharepoint.com/teams/DepartmentofManagementMarketing-DepartmentOperations/Shared Documents/TEACHING SUPPORT/Handbook (Course & Subject Changes)/Auto Handbook System/Automated Handbook Data System.xlsm"
 
@@ -28,10 +29,9 @@ Private Const TEACHING_STREAM_SHEET As String = "teaching stream"
 ' Workflow 3 Power Automate endpoint
 Private Const WORKFLOW3_URL As String = "https://default0e5bf3cf1ff446b7917652c538c22a.4d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7f198e614c734715bc0153d818de1ef7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=5uUuhFHyiL37O_ajy-6t2r65nFqc7NA_oJDhYmYFT9g"
 
-'------------------------------------------------------------------------------
-' ARRAY INDICES - Replace Private Type structures
-'------------------------------------------------------------------------------
 ' SubjectBlockInfo array indices (0-6)
+' Used to reference fields in the block info arrays returned by
+' IdentifySubjectBlocks
 Private Const SBI_SHEETNAME As Integer = 0
 Private Const SBI_SUBJECTCODE As Integer = 1
 Private Const SBI_STUDYPERIOD As Integer = 2
@@ -40,9 +40,17 @@ Private Const SBI_TOTALROW As Integer = 4
 Private Const SBI_LASTSUBJECTROW As Integer = 5
 Private Const SBI_NUMASSESSMENTROWS As Integer = 6
 
-'=============================================================================
-' MAIN ENTRY POINT - RefreshLecturerData
-'=============================================================================
+'===============================================================
+' SECTION 2: MAIN WORKFLOW
+'===============================================================
+
+'---------------------------------------------------------------
+' RefreshLecturerData
+' Purpose: Main entry point — read params, trigger workflow,
+'          wait for completion, identify subject blocks, load
+'          fresh data, and update lecturer columns
+' Called by: Refresh button on calculation sheets
+'---------------------------------------------------------------
 Public Sub RefreshLecturerData()
     On Error GoTo ErrorHandler
     
@@ -160,10 +168,12 @@ ErrorHandler:
            "Error " & Err.Number, vbCritical, "Refresh Error"
 End Sub
 
-'------------------------------------------------------------------------------
-' GET SOURCE PARAMETERS
-' Opens source file and reads Dashboard C2, C5, C12
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' GetSourceParameters
+' Purpose: Open the source workbook read-only and read year,
+'          teaching matrix filename, and email from Dashboard
+' Returns: True if valid parameters found
+'---------------------------------------------------------------
 Private Function GetSourceParameters(ByRef yearValue As String, ByRef teachingMatrix As String, ByRef emailValue As String) As Boolean
     On Error Resume Next
     
@@ -191,10 +201,12 @@ Private Function GetSourceParameters(ByRef yearValue As String, ByRef teachingMa
     On Error GoTo 0
 End Function
 
-'------------------------------------------------------------------------------
-' TRIGGER WORKFLOW 3
-' Sends HTTP POST to Power Automate endpoint
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' TriggerWorkflow3
+' Purpose: Send HTTP POST to the Power Automate endpoint with
+'          year/teaching matrix/email parameters
+' Returns: True if request succeeded
+'---------------------------------------------------------------
 Private Function TriggerWorkflow3(yearValue As String, teachingMatrix As String, emailValue As String) As Boolean
     On Error GoTo ErrorHandler
     
@@ -222,10 +234,12 @@ ErrorHandler:
     TriggerWorkflow3 = False
 End Function
 
-'------------------------------------------------------------------------------
-' WAIT FOR WORKFLOW 3 COMPLETION
-' Polls Dashboard F5 every 3 seconds until "DONE" or timeout
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' WaitForWorkflow3Completion
+' Purpose: Poll the source Dashboard F5 cell every 3 seconds
+'          until it shows DONE/COMPLETE/FINISHED or timeout
+' Returns: True if workflow completed
+'---------------------------------------------------------------
 Private Function WaitForWorkflow3Completion(maxWaitSeconds As Long) As Boolean
     On Error Resume Next
     
@@ -280,10 +294,12 @@ Private Function WaitForWorkflow3Completion(maxWaitSeconds As Long) As Boolean
     On Error GoTo 0
 End Function
 
-'------------------------------------------------------------------------------
-' GET WORKFLOW 3 STATUS
-' Opens source file read-only and reads Dashboard F5
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' GetWorkflow3Status
+' Purpose: Open source file read-only and read the current
+'          workflow status from Dashboard F5
+' Returns: Status string (e.g. "DONE", "Not Started")
+'---------------------------------------------------------------
 Private Function GetWorkflow3Status() As String
     On Error Resume Next
     
@@ -313,10 +329,16 @@ Private Function GetWorkflow3Status() As String
     On Error GoTo 0
 End Function
 
-'=============================================================================
-' HTTP REQUEST FUNCTIONS
-'=============================================================================
-Function SendRequestMac(url As String, jsonData As String) As String
+'===============================================================
+' SECTION 3: HTTP REQUESTS
+'===============================================================
+
+'---------------------------------------------------------------
+' SendRequestMac
+' Purpose: Send HTTP POST via AppleScript/curl (Mac only)
+' Returns: Response text, or "ERROR"
+'---------------------------------------------------------------
+Private Function SendRequestMac(url As String, jsonData As String) As String
     Dim scriptCode As String
     Dim result As String
     
@@ -335,7 +357,12 @@ Function SendRequestMac(url As String, jsonData As String) As String
     SendRequestMac = result
 End Function
 
-Function SendRequestWindows(url As String, jsonData As String) As String
+'---------------------------------------------------------------
+' SendRequestWindows
+' Purpose: Send HTTP POST via MSXML2 (Windows only)
+' Returns: Response text, or "ERROR"
+'---------------------------------------------------------------
+Private Function SendRequestWindows(url As String, jsonData As String) As String
     Dim http As Object
     
     On Error Resume Next
@@ -361,7 +388,11 @@ Function SendRequestWindows(url As String, jsonData As String) As String
     On Error GoTo 0
 End Function
 
-Function EscapeJSON(text As String) As String
+'---------------------------------------------------------------
+' EscapeJSON
+' Purpose: Escape special characters for JSON payload
+'---------------------------------------------------------------
+Private Function EscapeJSON(text As String) As String
     Dim result As String
     result = text
     
@@ -374,14 +405,16 @@ Function EscapeJSON(text As String) As String
     EscapeJSON = result
 End Function
 
-'=============================================================================
-' SUBJECT BLOCK IDENTIFICATION
-'=============================================================================
+'===============================================================
+' SECTION 4: SUBJECT BLOCK IDENTIFICATION
+'===============================================================
 
-'------------------------------------------------------------------------------
-' IDENTIFY SUBJECT BLOCKS
-' Scans FHY and SHY Calculations sheets to find all subject blocks
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' IdentifySubjectBlocks
+' Purpose: Scan FHY and SHY sheets to find all subject blocks
+'          by looking for UIDs ending in "_0" (header rows)
+' Called by: RefreshLecturerData
+'---------------------------------------------------------------
 Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
     On Error Resume Next
     
@@ -440,14 +473,16 @@ Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
     On Error GoTo 0
 End Sub
 
-'=============================================================================
-' TEACHING DATA LOADING
-'=============================================================================
+'===============================================================
+' SECTION 5: TEACHING DATA LOADING
+'===============================================================
 
-'------------------------------------------------------------------------------
-' LOAD TEACHING STREAM DATA
-' Opens source file and loads teaching stream sheet
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' LoadTeachingStreamData
+' Purpose: Open the source workbook and load columns B-G of
+'          the teaching stream sheet into a 2D array
+' Returns: 2D variant array, or Empty if no data
+'---------------------------------------------------------------
 Private Function LoadTeachingStreamData(sourcePath As String) As Variant
     On Error GoTo ErrorHandler
     
@@ -490,15 +525,18 @@ ErrorHandler:
     LoadTeachingStreamData = Empty
 End Function
 
-'=============================================================================
-' LECTURER DATA UPDATE - SIMPLIFIED (NO ORPHAN TRACKING)
-'=============================================================================
+'===============================================================
+' SECTION 6: LECTURER DATA UPDATE
+'===============================================================
 
-'------------------------------------------------------------------------------
-' UPDATE ALL LECTURERS
-' Refreshes columns L-O from teaching data, preserves P-S user edits
-' Adds rows if needed (before Total row), no orphan tracking
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' UpdateAllLecturers
+' Purpose: Refresh columns L-O from teaching data for every
+'          subject block, adding rows before Total if needed.
+'          Preserves user edits in columns P-S.
+' Called by: RefreshLecturerData
+' Returns: Number of subjects updated
+'---------------------------------------------------------------
 Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, subjectBlocks As Collection) As Long
     On Error Resume Next
     
@@ -625,10 +663,13 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
     On Error GoTo 0
 End Function
 
-'------------------------------------------------------------------------------
-' APPLY LECTURER FORMULAS
-' Applies formulas to columns Q & R for all lecturer rows
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' ApplyLecturerFormulas
+' Purpose: Write batch formulas for columns Q (Allocated Marking)
+'          and R (Marking Support Hours Available) for all
+'          lecturer rows in a subject block
+' Called by: UpdateAllLecturers
+'---------------------------------------------------------------
 Private Sub ApplyLecturerFormulas(ws As Worksheet, headerRow As Long, totalRow As Long)
     On Error Resume Next
     
@@ -668,14 +709,16 @@ Private Sub ApplyLecturerFormulas(ws As Worksheet, headerRow As Long, totalRow A
     On Error GoTo 0
 End Sub
 
-'=============================================================================
-' HELPER FUNCTIONS
-'=============================================================================
+'===============================================================
+' SECTION 7: HELPER FUNCTIONS
+'===============================================================
 
-'------------------------------------------------------------------------------
-' FIND TOTAL ROW
-' Searches for "Total" in Column E
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' FindTotalRow
+' Purpose: Search for the "Total" row in column E starting
+'          from the header row
+' Returns: Row number of the Total row
+'---------------------------------------------------------------
 Private Function FindTotalRow(ws As Worksheet, headerRow As Long) As Long
     Dim Row As Long
     For Row = headerRow + 1 To ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -701,10 +744,12 @@ Private Function FindTotalRow(ws As Worksheet, headerRow As Long) As Long
     FindTotalRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
 End Function
 
-'------------------------------------------------------------------------------
-' FIND LAST SUBJECT ROW
-' Finds the actual last row of the subject block
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' FindLastSubjectRow
+' Purpose: Find the last row of a subject block (before the
+'          next subject header or category header)
+' Returns: Row number of the last row in the block
+'---------------------------------------------------------------
 Private Function FindLastSubjectRow(ws As Worksheet, headerRow As Long) As Long
     Dim Row As Long
     For Row = headerRow + 1 To ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -731,11 +776,13 @@ Private Function FindLastSubjectRow(ws As Worksheet, headerRow As Long) As Long
     FindLastSubjectRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
 End Function
 
-'------------------------------------------------------------------------------
-' GET LECTURERS FROM TEACHING DATA
-' Extracts lecturers for a specific subject from teaching stream data
-' RETURNS: 2D Array instead of Collection (Mac-compatible)
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' GetLecturersFromTeachingData
+' Purpose: Extract matching lecturers for a subject from the
+'          teaching data array, trying exact then flexible
+'          study period matching
+' Returns: 2D array (1..N, 0..3) of lecturer data, or empty
+'---------------------------------------------------------------
 Private Function GetLecturersFromTeachingData(teachingData As Variant, subjectCode As String, studyPeriod As String) As Variant
     On Error Resume Next
     
@@ -814,10 +861,12 @@ Private Function GetLecturersFromTeachingData(teachingData As Variant, subjectCo
     GetLecturersFromTeachingData = lecturersArray
 End Function
 
-'------------------------------------------------------------------------------
-' COLLECTION KEY EXISTS
-' Checks if a key exists in a collection
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' CollectionKeyExists
+' Purpose: Test whether a key already exists in a VBA Collection
+'          (used for deduplication)
+' Returns: True if key exists
+'---------------------------------------------------------------
 Private Function CollectionKeyExists(col As Collection, key As String) As Boolean
     On Error Resume Next
     Dim temp As Variant

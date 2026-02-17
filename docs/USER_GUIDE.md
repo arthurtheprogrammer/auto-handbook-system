@@ -280,7 +280,7 @@ Columns E–J are locked because they contain formulas referencing the `assessme
 | F | Word Count | 🔒 | Word count per assessment, parsed from handbook data |
 | G | Exam | 🔒 | Exam duration (`Y`/`N`), parsed from handbook data |
 | H | Group Size | 🔒 | Group size if applicable, parsed from handbook data |
-| I | Assessment Quantity | 🔒 | **Formula** — calculates quantity per student (`enrolment ÷ group size` if group work). Set to `0` for in-class assessments detected by keyword (see [Overwriting Protected Cells](#overwriting-protected-cells) for details) |
+| I | Assessment Quantity | ✏️ | **Formula** — calculates quantity per student (`enrolment ÷ group size` if group work). Set to `0` for in-class assessments detected by keyword. Unlocked so users can override the calculated value if needed |
 | J | Marking Hours | 🔒 | **Formula** — `quantity × word count ÷ benchmark` (written) or `quantity ÷ exam benchmark` (exams). Benchmarks set in J2/J3. The total row sums all assessments for the subject |
 | K | Assessment Notes | ✏️ | Free-text notes about specific assessments |
 

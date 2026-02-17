@@ -1,3 +1,18 @@
+/**
+ * Script:  subjectListParser
+ * Purpose: Parse subject data from Power Automate (Enrolment Tracker),
+ *          apply exclusion rules, and write to the subject_list table
+ * Trigger: Power Automate Workflow 1 (Subject List Refresh)
+ * Output:  Populated subject_list table on SubjectList sheet,
+ *          progress_bar status updated on Dashboard
+ * Author:  Arthur Chen
+ * Repo:    github.com/arthurtheprogrammer/auto-handbook-system
+ *
+ * @param workbook      - Active workbook reference
+ * @param subjectData   - Array of subject records from Enrolment Tracker
+ * @param year          - Academic year (e.g. 2026)
+ * @param iterationDate - Date string used for UID generation
+ */
 function main(workbook: ExcelScript.Workbook, subjectData: object[], year: number, iterationDate: string) {
   // Define interface for type safety - using index signature for dynamic keys
   interface SubjectRecord {

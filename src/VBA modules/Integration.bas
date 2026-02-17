@@ -1,19 +1,32 @@
-'==============================================================================
-' VBA AUTOMATION SYSTEM WITH MONITORING
-' Purpose: Trigger workflows, monitor completion, run macros sequentially
-'==============================================================================
+'===============================================================
+' Module: Integration
+' Purpose: Orchestrate the full marking support generation:
+'          trigger Power Automate workflows, monitor completion,
+'          then run HTMLQuery, AssessmentData, and CalcSheets
+' Main Entry: GenerateMarkingSupport() - triggered by Dashboard button
+' Output: Status updates on Dashboard, completion email sent
+' Author: Arthur Chen
+' Repository: github.com/arthurtheprogrammer/auto-handbook-system
+' Dependencies:
+'   - Dashboard sheet (year, file paths, status cells)
+'   - SubjectListRefresh.bas, TeachingStreamRefresh.bas (workflows)
+'   - HTMLQuery.bas, AssessmentData.bas, CalculationSheets.bas
+'===============================================================
 
-'------------------------------------------------------------------------------
-' GLOBAL VARIABLES
-'------------------------------------------------------------------------------
 Public StopMonitoring As Boolean
 Public OriginalCalculationMode As XlCalculation
 Public SilentMode As Boolean
 
-'------------------------------------------------------------------------------
-' MAIN ENTRY POINT - GenerateMarkingSupport
-' Triggers workflows, monitors for completion, then runs all macros
-'------------------------------------------------------------------------------
+'===============================================================
+' SECTION 1: ORCHESTRATION
+'===============================================================
+
+'---------------------------------------------------------------
+' GenerateMarkingSupport
+' Purpose: Main entry point — validates inputs, triggers both
+'          workflows, monitors for completion, then runs all macros
+' Called by: Dashboard "Generate" button
+'---------------------------------------------------------------
 Sub GenerateMarkingSupport()
     Dim ws As Worksheet
     Dim yearValue As String
@@ -79,9 +92,13 @@ Sub GenerateMarkingSupport()
     MonitorAndExecute ws, emailValue
 End Sub
 
-'------------------------------------------------------------------------------
-' MONITOR AND EXECUTE - Wait for workflows, then run macros
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' MonitorAndExecute
+' Purpose: Poll Dashboard status cells (F2, F5) every 2 seconds
+'          until both workflows report completion, then run macros.
+'          Times out after 30 minutes.
+' Called by: GenerateMarkingSupport
+'---------------------------------------------------------------
 Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     Dim maxWaitMinutes As Integer
     Dim startTime As Double
@@ -182,9 +199,12 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     Application.Calculation = OriginalCalculationMode
 End Sub
 
-'------------------------------------------------------------------------------
-' FORCE CLOUD SYNC - Refresh data from SharePoint
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' ForceCloudSync
+' Purpose: Force a save/refresh/recalc cycle to pick up any
+'          SharePoint file changes between polling intervals
+' Called by: MonitorAndExecute
+'---------------------------------------------------------------
 Sub ForceCloudSync(ws As Worksheet)
     On Error Resume Next
     
@@ -213,9 +233,13 @@ Sub ForceCloudSync(ws As Worksheet)
     On Error GoTo 0
 End Sub
 
-'------------------------------------------------------------------------------
-' CHECK WORKFLOW COMPLETE - Detect completion and update status
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' CheckWorkflowComplete
+' Purpose: Check whether a Dashboard status cell contains
+'          DONE/COMPLETE/FINISHED and colour it green
+' Called by: MonitorAndExecute
+' Returns: True if the workflow is complete
+'---------------------------------------------------------------
 Function CheckWorkflowComplete(ws As Worksheet, cellAddress As String) As Boolean
     Dim cellValue As String
     
@@ -234,9 +258,13 @@ Function CheckWorkflowComplete(ws As Worksheet, cellAddress As String) As Boolea
     End If
 End Function
 
-'------------------------------------------------------------------------------
-' RUN ALL MACROS - Sequential execution
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' RunAllMacros
+' Purpose: Execute GenerateSubjectQueries, ParseAssessmentData,
+'          and GenerateCalculationSheets in sequence, updating
+'          Dashboard status cells along the way
+' Called by: MonitorAndExecute
+'---------------------------------------------------------------
 Sub RunAllMacros(ws As Worksheet, emailValue As String)
     
     ' Macro 1: GenerateSubjectQueries
@@ -299,9 +327,12 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
     DoEvents
 End Sub
 
-'------------------------------------------------------------------------------
-' FINALIZE PROCESS
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' FinalizeProcess
+' Purpose: Freeze the elapsed time display and send the
+'          completion email notification
+' Called by: MonitorAndExecute
+'---------------------------------------------------------------
 Sub FinalizeProcess(ws As Worksheet, emailValue As String)
     ' Freeze elapsed time
     With ws.Range("C17")
@@ -312,9 +343,12 @@ Sub FinalizeProcess(ws As Worksheet, emailValue As String)
     SendCompletionNotification ws, emailValue
 End Sub
 
-'------------------------------------------------------------------------------
-' EMAIL NOTIFICATION
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' SendCompletionNotification
+' Purpose: Send a completion email via Outlook with a link
+'          to the SharePoint output folder
+' Called by: FinalizeProcess
+'---------------------------------------------------------------
 Sub SendCompletionNotification(ws As Worksheet, emailValue As String)
     On Error Resume Next
     
@@ -347,9 +381,11 @@ Sub SendCompletionNotification(ws As Worksheet, emailValue As String)
     On Error GoTo 0
 End Sub
 
-'------------------------------------------------------------------------------
-' STOP WORKFLOW MONITORING
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' StopWorkflowMonitoring
+' Purpose: Allow the user to halt the monitoring loop early
+'          (e.g. via the macro menu or ESC)
+'---------------------------------------------------------------
 Sub StopWorkflowMonitoring()
     StopMonitoring = True
     
@@ -370,9 +406,10 @@ Sub StopWorkflowMonitoring()
     Application.Calculation = OriginalCalculationMode
 End Sub
 
-'------------------------------------------------------------------------------
-' RESET STATUS
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' ResetStatus
+' Purpose: Clear all Dashboard status cells and restore defaults
+'---------------------------------------------------------------
 Sub ResetStatus()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Dashboard")
@@ -386,9 +423,10 @@ Sub ResetStatus()
     MsgBox "All status cells reset.", vbInformation
 End Sub
 
-'------------------------------------------------------------------------------
-' HELPER - Clear Status Column
-'------------------------------------------------------------------------------
+'---------------------------------------------------------------
+' ClearStatusColumn
+' Purpose: Clear cells F2:F6 on the Dashboard
+'---------------------------------------------------------------
 Sub ClearStatusColumn(ws As Worksheet)
     With ws.Range("F2:F6")
         .Value = ""
@@ -396,9 +434,15 @@ Sub ClearStatusColumn(ws As Worksheet)
     End With
 End Sub
 
-'==============================================================================
-' HTTP REQUEST FUNCTIONS
-'==============================================================================
+'===============================================================
+' SECTION 2: HTTP REQUESTS
+'===============================================================
+
+'---------------------------------------------------------------
+' SendRequestMac
+' Purpose: Send an HTTP POST via AppleScript/curl (Mac only)
+' Returns: Response text, or "ERROR"
+'---------------------------------------------------------------
 
 Function SendRequestMac(url As String, jsonData As String) As String
     Dim scriptCode As String
@@ -419,6 +463,11 @@ Function SendRequestMac(url As String, jsonData As String) As String
     SendRequestMac = result
 End Function
 
+'---------------------------------------------------------------
+' SendRequestWindows
+' Purpose: Send an HTTP POST via MSXML2 (Windows only)
+' Returns: Response text, or "ERROR"
+'---------------------------------------------------------------
 Function SendRequestWindows(url As String, jsonData As String) As String
     Dim http As Object
     
@@ -445,9 +494,15 @@ Function SendRequestWindows(url As String, jsonData As String) As String
     On Error GoTo 0
 End Function
 
-'==============================================================================
-' UTILITY FUNCTIONS
-'==============================================================================
+'===============================================================
+' SECTION 3: UTILITY FUNCTIONS
+'===============================================================
+
+'---------------------------------------------------------------
+' GetOptionalValue
+' Purpose: Safely read a Dashboard cell to a string, returning
+'          empty string if the cell is blank, null, or errored
+'---------------------------------------------------------------
 
 Function GetOptionalValue(cellValue As Variant) As String
     On Error Resume Next
@@ -463,6 +518,11 @@ Function GetOptionalValue(cellValue As Variant) As String
     On Error GoTo 0
 End Function
 
+'---------------------------------------------------------------
+' EscapeJSON
+' Purpose: Escape special characters for safe inclusion in a
+'          JSON string payload sent to Power Automate
+'---------------------------------------------------------------
 Function EscapeJSON(text As String) As String
     Dim result As String
     result = text
