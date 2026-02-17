@@ -6,3 +6,7 @@
 
 # Windows
 Thumbs.db
+
+# Sensitive workbooks (if applicable)
+*.xlsm
+*.xlsx
