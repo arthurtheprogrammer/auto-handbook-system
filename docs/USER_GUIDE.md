@@ -180,6 +180,7 @@ These tables are populated automatically to build towards the final output sprea
 | J | Exclude | Checkbox to exclude subject | `TRUE` / `FALSE` |
 
 **Auto-exclusion rules** (applied by the system):
+
 - Subject code contains `FNCE`, `ACCT`, or `ECON`
 - Subject name contains "indigenous" or "indigenising"
 - Last 5 characters of subject code are not numeric
@@ -272,7 +273,7 @@ Each sheet has subjects organised by study period. Here is the full column break
 
 #### Assessment Data (E–K)
 
-Columns E–J are locked because they contain formulas referencing the `assessment data parsed` sheet and handbook data. Editing them would break the automatic calculations.
+Columns E–H & J are locked because they contain formulas referencing the `assessment data parsed` sheet and handbook data. Editing them would break the automatic calculations.
 
 | Col | Section | | Description |
 |-----|---------|:-:|-------------|
@@ -446,6 +447,7 @@ These three settings need to be configured **once per computer** before first us
 4. Select **Automatic**
 
 Or via settings:
+
 1. Go to **File** → **Options** → **Formulas**
 2. Under **Calculation options**, set **Workbook Calculation** to **Automatic**
 3. Click **OK**
@@ -458,6 +460,7 @@ Or via settings:
 4. Select **Automatic**
 
 Or via preferences:
+
 1. Go to **Excel** → **Preferences** → **Calculation**
 2. Under **Calculation**, select **Automatically**
 3. Close the preferences window
@@ -469,23 +472,27 @@ Or via preferences:
 ## Common Issues & Troubleshooting
 
 ### "Please enter a valid year" error
+
 - **Cause**: Cell C2 on the Dashboard is empty or contains text
 - **Fix**: Enter a number like `2026` in cell C2
 
 ### Process gets stuck at "Running..."
+
 - **Cause**: The cloud workflow didn't report back as complete
-- **Fix**: 
+- **Fix**:
   1. Check your internet connection
   2. Wait a few more minutes (sometimes SharePoint syncs slowly)
   3. If stuck for >10 minutes, run `StopWorkflowMonitoring` and try again
 
 ### Assessment data shows "Failed" for many subjects
+
 - **Cause**: The handbook year may not be published yet, or the year in C2 is wrong
-- **Fix**: 
+- **Fix**:
   1. Check that the year in C2 matches an existing handbook year
   2. Try opening one of the handbook URLs manually in your browser to verify
 
 ### "Required sheets are missing" error
+
 - **Cause**: One of the data sheets was renamed or deleted
 - **Fix**: Ensure these sheets exist with **exactly** these names:
   - `Dashboard`
@@ -494,16 +501,19 @@ Or via preferences:
   - `teaching stream`
 
 ### Lecturer Refresh button doesn't work
+
 - **Cause**: The source workbook path may have changed
 - **Fix**: Contact the developer to update the file path in the macro
 
 ### Changes to the Enrolment Tracker or Teaching Matrix aren't reflected
+
 - **Cause**: The system pulls fresh data each run, but file names must match
-- **Fix**: 
+- **Fix**:
   1. Make sure the filename in C3/C5 matches the actual file on SharePoint
   2. If you renamed the file, update C3/C5 accordingly
 
 ### Something broke and you're not sure why
+
 - **Cause**: SharePoint folders may have been moved/renamed, or sheet/table/column names were changed
 - **Fix** — run through this checklist:
   1. **File locations**: Confirm the Enrolment Tracker and Teaching Matrix files are still in the `TEACHING MATRIX & ENROLMENT TRACKER` folder on SharePoint and haven't been moved or renamed
