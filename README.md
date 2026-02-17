@@ -15,7 +15,7 @@ This system **automatically saves 40+ hours of manual data collection per semest
 
 ---
 
-## System Architecture
+## How It Works
 
 ```mermaid
 flowchart LR
@@ -79,27 +79,14 @@ flowchart LR
     SHY --> EXP
 ```
 
-## Key Results (OKR)
+The system pulls subject enrolment data and teaching assignments from SharePoint, scrapes assessment details from the [University Handbook](https://handbook.unimelb.edu.au/), and generates ready-to-use marking workload calculation spreadsheets — all triggered by a single button click.
 
-| Objective | Key Result |
-|-----------|-----------|
-| **Automate semester workload calculations** | Reduce manual data collection from ~40 hrs → <10 min per run |
-| **Eliminate data entry errors** | 100% of subject/assessment data sourced programmatically |
-| **Enable mid-semester updates** | Lecturer data refreshable via one-click button in exported file |
-| **Cross-platform compatibility** | Works on both Mac and Windows |
-| **Self-service for team** | Non-technical users can maintain data sources and trigger runs |
-
-## Impact
-
-- **Time saved**: ~40 hours per semester × 2 semesters = **80 hours/year** of manual work automated and multiple working documents consolidated
-- **Accuracy**: Eliminates transcription errors from manual data entry across 150+ subjects
-- **Versality**: Lecturer assignments can be refreshed in the exported file at any time, not just at generation
-- **Scalability**: Adding subjects/study periods requires zero code changes — just update the source spreadsheets
+---
 
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------:|
+|-------|----------:|
 | Data Sources | SharePoint Online (Excel files) |
 | Cloud Automation | Power Automate (HTTP-triggered flows) |
 | Data Parsing | Office Scripts (TypeScript, runs in Excel Online) |
@@ -107,38 +94,7 @@ flowchart LR
 | Processing & Generation | VBA (Excel macros, cross-platform Mac/Windows) |
 | Output | Excel workbook (.xlsm) with embedded VBA |
 
-## Repository Structure
-
-```
-auto-handbook-system/
-├── README.md                              ← You are here (project overview)
-├── LICENSE
-├── docs/
-│   ├── DEVELOPER_GUIDE.md                 ← Architecture, modules, data flow, troubleshooting
-│   └── USER_GUIDE.md                      ← Data sources, maintenance, column reference
-├── src/
-│   ├── VBA modules/
-│   │   ├── Integration.bas                ← Main orchestrator
-│   │   ├── SubjectListRefresh.bas         ← Trigger subject list workflow
-│   │   ├── TeachingStreamRefresh.bas      ← Trigger teaching stream workflow
-│   │   ├── HTMLQuery.bas                  ← Refresh & format Power Query table
-│   │   ├── AssessmentData.bas             ← Parse HTML assessment data
-│   │   ├── CalculationSheets.bas          ← Generate FHY/SHY calculation sheets
-│   │   └── LecturerRefresh.bas            ← Refresh lecturer data in exported file
-│   ├── office scripts/
-│   │   ├── subjectListParser.osts         ← Parse enrolment tracker → SubjectList table
-│   │   └── teachingStreamParser.osts      ← Parse teaching matrix → teaching stream table
-│   ├── power query/
-│   │   └── AllSubjectsHTML                ← Fetch assessment HTML from handbook
-│   └── power automate flows/
-│       ├── WORKFLOW_RUNDOWN.md            ← Flow documentation & step-by-step walkthrough
-│       ├── subjectlist.json               ← Subject list flow definition
-│       ├── teachingstream.json            ← Teaching stream flow definition
-│       ├── subject list workflow.png      ← Flow diagram screenshot
-│       └── teaching stream workflow.png   ← Flow diagram screenshot
-└── tests/
-    └── test-cases.md
-```
+---
 
 ## Quick Start
 
@@ -150,4 +106,57 @@ auto-handbook-system/
 6. Find the exported calculation file in the same SharePoint folder, or check for email notification
 
 > For detailed instructions, see the [User Guide](docs/USER_GUIDE.md).
-> For development and maintenance, see the [Developer Guide](docs/DEVELOPER_GUIDE.md).
+
+---
+
+## Repository Structure
+
+```
+auto-handbook-system/
+├── README.md                              ← You are here
+├── LICENSE
+├── docs/
+│   ├── DESIGN_DOC.md                     ← Problem, design decisions, tradeoffs, impact
+│   ├── DEVELOPER_GUIDE.md                ← Architecture, modules, data flow, troubleshooting
+│   └── USER_GUIDE.md                     ← Data sources, maintenance, column reference
+├── src/
+│   ├── VBA modules/
+│   │   ├── Integration.bas               ← Main orchestrator
+│   │   ├── SubjectListRefresh.bas        ← Trigger subject list workflow
+│   │   ├── TeachingStreamRefresh.bas     ← Trigger teaching stream workflow
+│   │   ├── HTMLQuery.bas                 ← Refresh & format Power Query table
+│   │   ├── AssessmentData.bas            ← Parse HTML assessment data
+│   │   ├── CalculationSheets.bas         ← Generate FHY/SHY calculation sheets
+│   │   └── LecturerRefresh.bas           ← Refresh lecturer data in exported file
+│   ├── office scripts/
+│   │   ├── subjectListParser.osts        ← Parse enrolment tracker → SubjectList table
+│   │   └── teachingStreamParser.osts     ← Parse teaching matrix → teaching stream table
+│   ├── power query/
+│   │   └── AllSubjectsHTML               ← Fetch assessment HTML from handbook
+│   └── power automate flows/
+│       ├── WORKFLOW_RUNDOWN.md           ← Flow documentation & step-by-step walkthrough
+│       ├── subjectlist.json              ← Subject list flow definition
+│       ├── teachingstream.json           ← Teaching stream flow definition
+│       ├── subject list workflow.png     ← Flow diagram screenshot
+│       └── teaching stream workflow.png  ← Flow diagram screenshot
+└── tests/
+    ├── test-cases.md                     ← Manual test scenarios & verification steps
+    └── golden-outputs/                   ← Archived baseline outputs (2025, 2026)
+```
+
+---
+
+## Documentation Guide
+
+| Document | Target Audience | What You'll Find |
+|----------|----------|-----------------|
+| 📋 [Design Doc](docs/DESIGN_DOC.md) | Stakeholders, hiring managers | Problem statement, design decisions, tradeoffs, measurable impact |
+| 👤 [User Guide](docs/USER_GUIDE.md) | Team members (non-technical) | Step-by-step instructions, data sources, troubleshooting |
+| 🔧 [Developer Guide](docs/DEVELOPER_GUIDE.md) | Maintainers, developers | Architecture, module reference, cell references, cross-platform notes |
+| 🧪 [Test Cases](tests/test-cases.md) | QA, verification | Manual test scenarios, archived output baselines |
+
+---
+
+## License
+
+[MIT](LICENSE)

@@ -12,6 +12,7 @@ A guide for team members who manage the data sources and run the system. No codi
 - [Data Source Reference](#data-source-reference)
 - [Dashboard Parameters](#dashboard-parameters)
 - [Understanding the Output](#understanding-the-output-marking--admin-support-calculations)
+- [Backing Up](#backing-up)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
 - [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
@@ -340,6 +341,22 @@ To make changes to locked cells or add/remove rows, you need to **unprotect the 
 When detected, word count and exam duration are set to `0` and the assessment quantity formula adjusts accordingly. However, because handbook descriptions are not standardised, **the system cannot catch every case**. If an assessment was incorrectly classified (or missed), unprotect the sheet and manually adjust the Assessment Quantity (column I) or Marking Hours (column J) as needed.
 
 **Adding more rows** — If you need extra rows beyond what the system generated (e.g., for additional lecturers or notes), unprotect the sheet first, then insert rows as needed.
+
+---
+
+## Backing Up
+
+> [!IMPORTANT]
+> **Always use the original working document** (`Automated Handbook Data System.xlsm`) for generating sheets — this is the file with all VBA macros and Power Automate flows linked to it. Do **not** run the system from a backup copy.
+
+After each successful run, **save a backup** of both files to preserve that semester's data:
+
+1. **The source workbook** — copy `Automated Handbook Data System.xlsm` and rename it (e.g., `Automated Handbook Data System - 2026 S1 backup.xlsm`)
+2. **The exported calculation file** — this is already a separate file (e.g., `2026 Marking Admin Support Calculations.xlsm`)
+
+Store backups in the `backups` folder within the **Auto Handbook System** folder on SharePoint so the team can refer to previous years' outputs if needed.
+
+> **Why back up?** Each run overwrites the data tables in the source workbook (SubjectList, teaching stream, assessment data). If you want to keep a snapshot of a particular semester's data — for example, to compare year-over-year — you need to save a copy before running again.
 
 ---
 
