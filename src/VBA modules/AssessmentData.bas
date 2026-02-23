@@ -36,15 +36,14 @@ Sub ParseAssessmentData()
     Dim wsSource As Worksheet
     Dim wsTarget As Worksheet
     Dim lastRow As Long
-    Dim i As Long
-    Dim currentRow As Long
+    Dim sourceRow As Long
+    Dim outputRow As Long
     Dim subjectCode As String
     Dim htmlContent As String
         
-    ' Set up source worksheet
     Set wsSource = ThisWorkbook.Sheets("AllSubjectsHTML")
     
-    ' Create or clear target worksheet
+    ' Create target sheet if missing, otherwise clear stale data
     On Error Resume Next
     Set wsTarget = ThisWorkbook.Sheets("assessment data parsed")
     If wsTarget Is Nothing Then
@@ -55,28 +54,26 @@ Sub ParseAssessmentData()
     End If
     On Error GoTo 0
     
-    ' Set up headers
     Call SetupHeaders(wsTarget)
     
-    ' Initialize processing
-    currentRow = 2
+    ' Row 1 is headers in both source and target
+    outputRow = 2
     lastRow = wsSource.Cells(wsSource.Rows.count, "A").End(xlUp).Row
     
-    ' Process each subject
-    For i = 2 To lastRow ' Row 1 has headers
-        subjectCode = Trim(wsSource.Cells(i, 1).Value)
-        htmlContent = wsSource.Cells(i, 3).Value
+    ' Iterate each subject from AllSubjectsHTML
+    For sourceRow = 2 To lastRow
+        subjectCode = Trim(wsSource.Cells(sourceRow, 1).Value)
+        htmlContent = wsSource.Cells(sourceRow, 3).Value
             
+        ' Skip rows with no code or empty HTML (failed fetches)
         If subjectCode <> "" And htmlContent <> "" Then
-            Call ProcessSubjectHTML(subjectCode, htmlContent, wsTarget, currentRow)
+            Call ProcessSubjectHTML(subjectCode, htmlContent, wsTarget, outputRow)
         End If
-    Next i
+    Next sourceRow
     
-    ' Apply final formatting
-    Call FormatOutput(wsTarget, currentRow)
+    Call FormatOutput(wsTarget, outputRow)
     
-    ' Show completion message
-    If Not SilentMode Then MsgBox "Assessment data parsing completed! " & (currentRow - 2) & " records processed."
+    If Not SilentMode Then MsgBox "Assessment data parsing completed! " & (outputRow - 2) & " records processed."
 End Sub
 
 '---------------------------------------------------------------
@@ -105,37 +102,33 @@ End Sub
 '          to the finished assessment data sheet
 ' Called by: ParseAssessmentData
 '---------------------------------------------------------------
-Sub FormatOutput(wsTarget As Worksheet, currentRow As Long)
+Sub FormatOutput(wsTarget As Worksheet, outputRow As Long)
     With wsTarget
-        ' Auto-fit all columns first
         .Columns.AutoFit
             
-        ' Set specific width for Assessment Description column
+        ' Description column (D) needs extra width for long assessment text
         .Columns("D").ColumnWidth = 150
-        
-        ' Wrap text for Assessment Description column
         .Columns("D").WrapText = True
         
-        ' Set uniform width for Location to Group Size columns (E to H)
+        ' Standardise width for short numeric columns (Location to Group Size)
         .Columns("E:H").ColumnWidth = 15
         
-        ' Center align columns from Location to Percentage (E to H, J)
-        If currentRow > 1 Then
-            .Range("E1:H" & (currentRow - 1)).HorizontalAlignment = xlCenter
-            .Range("J1:J" & (currentRow - 1)).HorizontalAlignment = xlCenter
+        ' Centre-align numeric/categorical columns for scannability
+        If outputRow > 1 Then
+            .Range("E1:H" & (outputRow - 1)).HorizontalAlignment = xlCenter
+            .Range("J1:J" & (outputRow - 1)).HorizontalAlignment = xlCenter
         End If
         
-        ' Left align Timing column (I)
-        If currentRow > 1 Then
-            .Range("I1:I" & (currentRow - 1)).HorizontalAlignment = xlLeft
+        ' Left-align Timing (col I) — contains longer text phrases
+        If outputRow > 1 Then
+            .Range("I1:I" & (outputRow - 1)).HorizontalAlignment = xlLeft
         End If
             
-        ' Format headers
         .Range("A1:J1").Font.Bold = True
             
-        ' Set uniform row height for data rows
-        If currentRow > 2 Then
-            .Range("2:" & (currentRow - 1)).RowHeight = 15
+        ' Uniform row height for consistent appearance
+        If outputRow > 2 Then
+            .Range("2:" & (outputRow - 1)).RowHeight = 15
         End If
     End With
 End Sub
@@ -149,26 +142,23 @@ End Sub
 ' Purpose: Parse one subject's HTML content into assessment rows
 ' Called by: ParseAssessmentData
 '---------------------------------------------------------------
-Sub ProcessSubjectHTML(subjectCode As String, htmlContent As String, wsTarget As Worksheet, ByRef currentRow As Long)
+Sub ProcessSubjectHTML(subjectCode As String, htmlContent As String, wsTarget As Worksheet, ByRef outputRow As Long)
     Dim studyPeriods() As StudyPeriodData
     Dim periodCount As Integer
     Dim i As Integer
     Dim j As Integer
     Dim assessmentCount As Integer
     
-    ' Extract all study periods with their assessments
     Call ExtractStudyPeriods(htmlContent, studyPeriods, periodCount)
     
-    ' Process each study period
     For i = 0 To periodCount - 1
         assessmentCount = 1
             
-        ' Process each assessment in this study period
         For j = 0 To studyPeriods(i).assessmentCount - 1
             If Trim(studyPeriods(i).assessments(j)) <> "" Then
-                Call ProcessAssessmentRow(subjectCode, studyPeriods(i).periodName, assessmentCount, studyPeriods(i).assessments(j), wsTarget, currentRow)
+                Call ProcessAssessmentRow(subjectCode, studyPeriods(i).periodName, assessmentCount, studyPeriods(i).assessments(j), wsTarget, outputRow)
                 assessmentCount = assessmentCount + 1
-                currentRow = currentRow + 1
+                outputRow = outputRow + 1
             End If
         Next j
     Next i
@@ -310,7 +300,7 @@ End Sub
 '          fields and write them to the target sheet
 ' Called by: ProcessSubjectHTML
 '---------------------------------------------------------------
-Sub ProcessAssessmentRow(subjectCode As String, studyPeriod As String, assessmentCount As Integer, rowContent As String, wsTarget As Worksheet, currentRow As Long)
+Sub ProcessAssessmentRow(subjectCode As String, studyPeriod As String, assessmentCount As Integer, rowContent As String, wsTarget As Worksheet, outputRow As Long)
     Dim uid As String
     Dim description As String
     Dim wordCount As Long
@@ -320,33 +310,27 @@ Sub ProcessAssessmentRow(subjectCode As String, studyPeriod As String, assessmen
     Dim timing As String
     Dim percentage As String
     
-    ' Generate UID
     uid = subjectCode & "_" & studyPeriod & "_" & assessmentCount
     
-    ' Extract and clean description
     description = ExtractDescription(rowContent)
     
     ' Determine if this is an in-class assessment
     isInClassAssessment = CheckIfInClass(description)
     
-    ' Extract numerical data based on assessment type
     If isInClassAssessment Then
-        wordCount = 0          ' Don't extract word count for in-class assessments
-        examDuration = 0       ' Don't extract exam duration for in-class assessments
+        wordCount = 0
+        examDuration = 0
     Else
         wordCount = ExtractWordCount(rowContent)
         examDuration = ExtractExamDuration(description)
     End If
     
-    ' Always extract group size regardless of assessment type
     groupSize = ExtractGroupSize(description)
     
-    ' Extract timing and percentage
     timing = ExtractTiming(rowContent)
     percentage = ExtractPercentage(rowContent)
     
-    ' Write data to worksheet
-    Call WriteAssessmentData(wsTarget, currentRow, uid, subjectCode, studyPeriod, description, wordCount, examDuration, groupSize, isInClassAssessment, timing, percentage)
+    Call WriteAssessmentData(wsTarget, outputRow, uid, subjectCode, studyPeriod, description, wordCount, examDuration, groupSize, isInClassAssessment, timing, percentage)
 End Sub
 
 '---------------------------------------------------------------
@@ -373,24 +357,23 @@ End Function
 ' Purpose: Write a single parsed assessment row to the target sheet
 ' Called by: ProcessAssessmentRow
 '---------------------------------------------------------------
-Sub WriteAssessmentData(wsTarget As Worksheet, currentRow As Long, uid As String, subjectCode As String, studyPeriod As String, description As String, wordCount As Long, examDuration As Integer, groupSize As Integer, isInClass As Boolean, timing As String, percentage As String)
+Sub WriteAssessmentData(wsTarget As Worksheet, outputRow As Long, uid As String, subjectCode As String, studyPeriod As String, description As String, wordCount As Long, examDuration As Integer, groupSize As Integer, isInClass As Boolean, timing As String, percentage As String)
     With wsTarget
-        .Cells(currentRow, 1).Value = uid
-        .Cells(currentRow, 2).Value = subjectCode
-        .Cells(currentRow, 3).Value = studyPeriod
-        .Cells(currentRow, 4).Value = description
+        .Cells(outputRow, 1).Value = uid
+        .Cells(outputRow, 2).Value = subjectCode
+        .Cells(outputRow, 3).Value = studyPeriod
+        .Cells(outputRow, 4).Value = description
         
-        ' Set assessment location for in-class assessments
-        If isInClass Then .Cells(currentRow, 5).Value = "in class"
+        ' Flag in-class assessments so CalculationSheets can skip word-count formulas
+        If isInClass Then .Cells(outputRow, 5).Value = "in class"
         
         ' Only populate if values are greater than 0
-        If wordCount > 0 Then .Cells(currentRow, 6).Value = wordCount
-        If examDuration > 0 Then .Cells(currentRow, 7).Value = examDuration
-        If groupSize > 0 Then .Cells(currentRow, 8).Value = groupSize
+        If wordCount > 0 Then .Cells(outputRow, 6).Value = wordCount
+        If examDuration > 0 Then .Cells(outputRow, 7).Value = examDuration
+        If groupSize > 0 Then .Cells(outputRow, 8).Value = groupSize
         
-        ' Add timing and percentage
-        If timing <> "" Then .Cells(currentRow, 9).Value = timing
-        If percentage <> "" Then .Cells(currentRow, 10).Value = percentage
+        If timing <> "" Then .Cells(outputRow, 9).Value = timing
+        If percentage <> "" Then .Cells(outputRow, 10).Value = percentage
     End With
 End Sub
 

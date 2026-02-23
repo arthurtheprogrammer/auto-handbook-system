@@ -35,14 +35,13 @@ Private Const ENROLMENT_TRACKER_BASE As String = "https://unimelbcloud.sharepoin
 '   - wb: the workbook to add the log sheet to
 '---------------------------------------------------------------
 Sub InitializeProcessLog(wb As Workbook)
-    Dim tempLog As Worksheet
+    Dim processLogSheet As Worksheet
     Dim existingLog As Worksheet
-    Dim deleteSuccess As Boolean
-    
     On Error Resume Next
     wb.Unprotect
     Set wsLog = Nothing
     
+    ' Remove stale log sheet from any previous run
     Set existingLog = wb.Sheets("Process Log")
     If Not existingLog Is Nothing Then
         existingLog.Unprotect
@@ -61,31 +60,33 @@ Sub InitializeProcessLog(wb As Workbook)
     On Error GoTo ErrorHandler
     Application.ScreenUpdating = False
     
-    Set tempLog = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.count))
+    Set processLogSheet = wb.Sheets.add(After:=wb.Sheets(wb.Sheets.count))
     
     On Error Resume Next
-    tempLog.name = "Process Log"
+    processLogSheet.name = "Process Log"
     
+    ' Handle naming conflict — fall back to timestamped name
     If Err.Number <> 0 Then
         Dim errNum As Long
         errNum = Err.Number
         Err.Clear
         
-        tempLog.name = "ProcessLog_" & Format(Now, "hhmmss")
+        processLogSheet.name = "ProcessLog_" & Format(Now, "hhmmss")
         If Err.Number <> 0 Then
             If Not SilentMode Then MsgBox "CRITICAL: Could not name log sheet (Error " & errNum & "). Process aborted.", vbCritical
-            tempLog.Delete
+            processLogSheet.Delete
             Application.ScreenUpdating = True
             End
         Else
-            If Not SilentMode Then MsgBox "Log sheet created with alternative name: " & tempLog.name, vbInformation
+            If Not SilentMode Then MsgBox "Log sheet created with alternative name: " & processLogSheet.name, vbInformation
         End If
     End If
     
     On Error GoTo ErrorHandler
     
+    ' Assign to module-level wsLog so LogMessage can write to it
     Set wsLog = Nothing
-    Set wsLog = wb.Sheets(tempLog.name)
+    Set wsLog = wb.Sheets(processLogSheet.name)
     If wsLog Is Nothing Then
         If Not SilentMode Then MsgBox "CRITICAL: Failed to verify log sheet creation.", vbCritical
         Application.ScreenUpdating = True
@@ -100,7 +101,7 @@ Sub InitializeProcessLog(wb As Workbook)
         .Cells(1, 2).Font.Bold = True
         .Cells(1, 3).Font.Bold = True
         .Columns("A:A").ColumnWidth = 20
-        .Columns("B:B").ColumnWidth = 100
+        .Columns("B:B").ColumnWidth = 80
         .Columns("C:C").ColumnWidth = 15
     End With
     
@@ -171,7 +172,7 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
     Dim i As Integer
     Dim sheetExists As Boolean
     Dim sheetName As String
-    Dim ws As Worksheet
+    Dim targetSheet As Worksheet
     
     LogMessage "=== Verifying Required Sheets ==="
     VerifyRequiredSheets = True
@@ -181,8 +182,8 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
         sheetExists = False
         
         On Error Resume Next
-        Set ws = wb.Sheets(sheetName)
-        If Err.Number = 0 And Not ws Is Nothing Then
+        Set targetSheet = wb.Sheets(sheetName)
+        If Err.Number = 0 And Not targetSheet Is Nothing Then
             sheetExists = True
             LogMessage "Sheet found: " & sheetName
         Else
@@ -192,7 +193,7 @@ Function VerifyRequiredSheets(wb As Workbook) As Boolean
         Err.Clear
         On Error GoTo 0
         
-        Set ws = Nothing
+        Set targetSheet = Nothing
     Next i
     
     If Not VerifyRequiredSheets Then
@@ -613,52 +614,6 @@ End Function
 
 
 '---------------------------------------------------------------
-' GetUniqueFilename
-' Purpose: Generate a unique filename by appending a timestamp
-'          if the target path already exists
-' Called by: ExportCalculationSheets
-' Returns: A file path guaranteed not to conflict
-'---------------------------------------------------------------
-Function GetUniqueFilename(basePath As String, baseName As String, ext As String) As String
-    On Error GoTo ErrorHandler
-    
-    Dim fullPath As String
-    Dim timestamp As String
-    Dim counter As Integer
-    
-    fullPath = basePath & baseName & ext
-    
-    If Dir(fullPath) = "" Then
-        GetUniqueFilename = fullPath
-        Exit Function
-    End If
-    
-    timestamp = Format(Now, "_yyyymmdd_hhmmss")
-    fullPath = basePath & baseName & timestamp & ext
-    
-    counter = 1
-    Do While Dir(fullPath) <> ""
-        fullPath = basePath & baseName & timestamp & "_" & counter & ext
-        counter = counter + 1
-        
-        If counter > 100 Then
-            Debug.Print "CRITICAL FAILURE in GetUniqueFilename: Could not generate unique filename after 100 attempts"
-            GetUniqueFilename = basePath & baseName & timestamp & "_" & Format(Timer * 1000, "0") & ext
-            Exit Function
-        End If
-    Loop
-    
-    GetUniqueFilename = fullPath
-    Exit Function
-    
-ErrorHandler:
-    Debug.Print "Internal error suppressed in GetUniqueFilename: " & Err.description
-    On Error Resume Next
-    GetUniqueFilename = basePath & baseName & ext
-    On Error GoTo 0
-End Function
-
-'---------------------------------------------------------------
 ' GetBenchmarkValue
 ' Purpose: Read a benchmark number from a Dashboard cell,
 '          falling back to a default if the cell is empty/invalid
@@ -668,17 +623,17 @@ End Function
 Function GetBenchmarkValue(wb As Workbook, sheetName As String, cellRef As String, defaultValue As Double) As Double
     On Error GoTo ErrorHandler
     
-    Dim ws As Worksheet
-    Set ws = wb.Sheets(sheetName)
+    Dim benchmarkSheet As Worksheet
+    Set benchmarkSheet = wb.Sheets(sheetName)
     
-    If ws Is Nothing Then
+    If benchmarkSheet Is Nothing Then
         LogMessage "WARNING: Sheet " & sheetName & " not found, using default: " & defaultValue
         GetBenchmarkValue = defaultValue
         Exit Function
     End If
     
     Dim cellValue As Variant
-    cellValue = ws.Range(cellRef).Value
+    cellValue = benchmarkSheet.Range(cellRef).Value
     
     If IsNumeric(cellValue) And cellValue <> "" Then
         GetBenchmarkValue = CDbl(cellValue)
@@ -1016,7 +971,7 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
         currentRow = currentRow + 1
     End If
     
-    ' Categorize subjects
+    ' Categorise subjects
     Dim summerSubjects As New Collection
     Dim semester1Subjects As New Collection
     Dim winterSubjects As New Collection
@@ -1028,7 +983,7 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
         studyPeriod = SafeArrayIndex(subject, 3, "")
         
         Dim category As String
-        category = CategorizeStudyPeriod(studyPeriod, groupedPeriod)
+        category = CategoriseStudyPeriod(studyPeriod, groupedPeriod)
         
         Select Case category
             Case "SUMMER": summerSubjects.add subject
@@ -1275,15 +1230,6 @@ ErrorHandler:
     ProcessSubject = False
 End Function
 
-'---------------------------------------------------------------
-' BuildAssessmentQuantityFormula
-' Purpose: Build a VLOOKUP formula to pull assessment quantity
-'          (percentage/timing) from the assessment data sheet
-'---------------------------------------------------------------
-Function BuildAssessmentQuantityFormula(rowNum As Long, assessUID As String, subjectCode As String, studyPeriod As String) As String
-    ' This builds the VLOOKUP formula for assessment quantity
-    BuildAssessmentQuantityFormula = "=IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""" & studyPeriod & """)),9,FALSE),IFERROR(VLOOKUP(""" & assessUID & """,FILTER('assessment data parsed'!$A:$I,('assessment data parsed'!$B:$B=""" & subjectCode & """)*('assessment data parsed'!$C:$C=""All"")),9,FALSE),""""))"
-End Function
 
 '---------------------------------------------------------------
 ' SetContractDropdown
@@ -1783,38 +1729,38 @@ ErrorHandler:
 End Sub
 
 '---------------------------------------------------------------
-' CategorizeStudyPeriod
+' CategoriseStudyPeriod
 ' Purpose: Map a study period name to its display category
 '          (Summer, Semester 1, Winter, or Semester 2)
 '---------------------------------------------------------------
-Function CategorizeStudyPeriod(studyPeriod As String, groupedPeriod As String) As String
+Function CategoriseStudyPeriod(studyPeriod As String, groupedPeriod As String) As String
     Dim sp As String
     sp = LCase(studyPeriod)
     
     If InStr(sp, "summer") > 0 Or InStr(sp, "october") > 0 Or InStr(sp, "november") > 0 Or InStr(sp, "term 1") > 0 Then
-        CategorizeStudyPeriod = "SUMMER"
+        CategoriseStudyPeriod = "SUMMER"
         Exit Function
     End If
     
     If InStr(sp, "winter") > 0 Or InStr(sp, "june") > 0 Or InStr(sp, "july") > 0 Then
-        CategorizeStudyPeriod = "WINTER"
+        CategoriseStudyPeriod = "WINTER"
         Exit Function
     End If
     
     If InStr(sp, "semester 1") > 0 Or InStr(sp, "term 2") > 0 Then
-        CategorizeStudyPeriod = "SEMESTER 1"
+        CategoriseStudyPeriod = "SEMESTER 1"
         Exit Function
     End If
     
     If InStr(sp, "semester 2") > 0 Or InStr(sp, "term 3") > 0 Or InStr(sp, "term 4") > 0 Then
-        CategorizeStudyPeriod = "SEMESTER 2"
+        CategoriseStudyPeriod = "SEMESTER 2"
         Exit Function
     End If
     
     If groupedPeriod = "FHY" Then
-        CategorizeStudyPeriod = "SEMESTER 1"
+        CategoriseStudyPeriod = "SEMESTER 1"
     Else
-        CategorizeStudyPeriod = "SEMESTER 2"
+        CategoriseStudyPeriod = "SEMESTER 2"
     End If
 End Function
 
@@ -2036,7 +1982,7 @@ Sub FormatSheet(ws As Worksheet)
             ws.Columns(baseCol + offset).NumberFormat = IIf(offset = 6, "0.00", "0")
         Next offset
         
-        ' Center alignment
+        ' Centre alignment
         For offset = 0 To UBound(centerOffsets)
             ws.Columns(baseCol + centerOffsets(offset)).HorizontalAlignment = xlCenter
         Next offset
@@ -2218,24 +2164,22 @@ Sub AddRefreshButtonsToSheets(wb As Workbook)
     
     LogMessage "Adding refresh buttons to sheets..."
     
-    Dim ws As Worksheet
+    Dim calcSheet As Worksheet
     Dim btn As Button
     
-    ' Add button to FHY Calculations sheet
+    ' FHY Calculations sheet
     On Error Resume Next
-    Set ws = wb.Sheets("FHY Calculations")
+    Set calcSheet = wb.Sheets("FHY Calculations")
     On Error GoTo ErrorHandler
     
-    If Not ws Is Nothing Then
-        ' Delete existing button if present
+    If Not calcSheet Is Nothing Then
         On Error Resume Next
-        ws.Buttons.Delete
+        calcSheet.Buttons.Delete
         Err.Clear
         On Error GoTo ErrorHandler
         
-        ' Add new button at L2
-        Set btn = ws.Buttons.add(ws.Range("L2").Left, ws.Range("L2").Top, _
-                                  ws.Range("L2").Width, ws.Range("L2").Height)
+        Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
+                                  calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
         
         With btn
             .OnAction = "RefreshLecturerData"
@@ -2246,22 +2190,20 @@ Sub AddRefreshButtonsToSheets(wb As Workbook)
         LogMessage "Added refresh button to FHY Calculations at L2"
     End If
     
-    ' Add button to SHY Calculations sheet
-    Set ws = Nothing
+    ' SHY Calculations sheet
+    Set calcSheet = Nothing
     On Error Resume Next
-    Set ws = wb.Sheets("SHY Calculations")
+    Set calcSheet = wb.Sheets("SHY Calculations")
     On Error GoTo ErrorHandler
     
-    If Not ws Is Nothing Then
-        ' Delete existing button if present
+    If Not calcSheet Is Nothing Then
         On Error Resume Next
-        ws.Buttons.Delete
+        calcSheet.Buttons.Delete
         Err.Clear
         On Error GoTo ErrorHandler
         
-        ' Add new button at L2
-        Set btn = ws.Buttons.add(ws.Range("L2").Left, ws.Range("L2").Top, _
-                                  ws.Range("L2").Width, ws.Range("L2").Height)
+        Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
+                                  calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
         
         With btn
             .OnAction = "RefreshLecturerData"

@@ -23,7 +23,7 @@ A guide for team members who manage the data sources and run the system. No codi
 
 Think of this system as a **data assembly line**:
 
-```
+```text
 📂 Enrolment Tracker  ─┐
                         ├──→  🤖 System processes  ──→  📊 Calculation Spreadsheet
 📂 Teaching Matrix    ─┘      everything for you         (ready to use)
@@ -43,7 +43,7 @@ Think of this system as a **data assembly line**:
 Make sure these files exist on SharePoint:
 
 | What | Where |
-|------|-------|
+| ---- | ----- |
 | **Enrolment Tracker** (`.xlsx`) | `TEACHING MATRIX & ENROLMENT TRACKER` folder |
 | **Teaching Matrix** (`.xlsx`) | `TEACHING MATRIX & ENROLMENT TRACKER` folder |
 | **Automated Handbook Data System** (`.xlsm`) | `TEACHING SUPPORT > Handbook > Auto Handbook System` folder |
@@ -55,7 +55,7 @@ Make sure these files exist on SharePoint:
 3. **Fill in** the required fields:
 
    | Cell | What to Enter | Example |
-   |------|--------------|---------|
+   | ---- | ------------- | ------- |
    | **C2** | The year | `2026` |
    | **C3** | Enrolment Tracker filename (leave blank for default) | `2026 Enrolment Tracker.xlsx` |
    | **C5** | Teaching Matrix filename (leave blank for default) | `2026 Teaching Matrix.xlsx` |
@@ -68,7 +68,7 @@ Make sure these files exist on SharePoint:
 5. **Wait** — the process takes approximately 5–10 minutes. You'll see status updates in column F:
 
    | Cell | Step | Status |
-   |------|------|--------|
+   | ---- | ---- | ------ |
    | F2 | Subject List Refresh | Running... → Complete |
    | F3 | Generate Subject Queries | Running... → Complete (or **Skipped** on Mac) |
    | F4 | Parse Assessment Data | Running... → Complete |
@@ -80,7 +80,10 @@ Make sure these files exist on SharePoint:
 > [!NOTE]
 > **Running on a Mac?** The Subject Queries step (F3) fetches handbook data from the university website and only runs on Windows. On Mac it will be **skipped** — the system will show a message and continue using existing data. This is fine after the first proper run each academic year, as handbook content rarely changes once semester starts.
 
-> **Tip**: If you need to stop the process, run `StopWorkflowMonitoring` from the macro menu.
+<!-- -->
+
+> [!TIP]
+> If you need to stop the process, run `StopWorkflowMonitoring` from the macro menu.
 
 ---
 
@@ -89,7 +92,7 @@ Make sure these files exist on SharePoint:
 ### ✅ Things You Should Keep Updated
 
 | Item | Why | How Often |
-|------|-----|-----------|
+| ---- | --- | --------- |
 | **Enrolment Tracker** file | Provides subject codes and enrolments | Each semester |
 | **Teaching Matrix** file | Provides lecturer assignments | Each semester |
 | **Year in C2** | Used to fetch the correct handbook year | Each year |
@@ -98,7 +101,7 @@ Make sure these files exist on SharePoint:
 ### ⚠️ Things You Should NOT Change
 
 | Item | Why |
-|------|-----|
+| ---- | --- |
 | Sheet names (`SubjectList`, `teaching stream`, `AllSubjectsHTML`, `assessment data parsed`) | The macros look for these exact names |
 | Table names in the **source workbook** (`subject_list`, `teaching_stream`, `AllSubjectsHTML`, `progress_bar`) | The macros look for these exact names |
 | Table names in the **Enrolment Tracker** (`Enrolment_Tracker`) | Power Automate reads from this table |
@@ -124,7 +127,7 @@ These are the SharePoint files you manage. The system reads specific columns fro
 The system reads these columns (matched by keyword, not exact name):
 
 | Keyword Matched | Example Column Header | What the Script Extracts |
-|----------------|----------------------|------------------------|
+| --------------- | --------------------- | ------------------------ |
 | `Subject Code` | Subject Code | Subject code (e.g., `MGMT10101`) |
 | `Subject Name` | Subject Name | Full subject name |
 | `Subject Coordinator` | Subject Coordinator | Coordinator name |
@@ -138,7 +141,7 @@ Other columns (Quota/Cap, enrolment numbers, predictions, program breakdowns, et
 #### Teaching Matrix — Teaching Data Sheet
 
 | Keyword Matched | Example Column Header | What the Script Extracts |
-|----------------|----------------------|------------------------|
+| --------------- | --------------------- | ------------------------ |
 | `Subject Code` | Subject Code DO NOT SORT | Subject code |
 | `Study Period` | Study Period | e.g., `Semester 1` |
 | `Lecturer` | Lecturer DO NOT SORT | Lecturer name |
@@ -149,7 +152,7 @@ Other columns (Credit Points, Teaching Hours, Quota/Cap, Day/Start/Finish/Venue,
 #### Teaching Matrix — Staff Sheet
 
 | Keyword Matched | Example Column Header | What the Script Extracts |
-|----------------|----------------------|------------------------|
+| --------------- | --------------------- | ------------------------ |
 | `Title Given Name Family Name` | Title Given Name Family Name | Lecturer display name (used to match with teaching data) |
 | `Status` | Status DO NOT SORT | Employment status (e.g., `Continuing T&R`, `Continuing T`, `Fixed Term`) |
 
@@ -167,7 +170,7 @@ These tables are populated automatically to build towards the final output sprea
 #### `SubjectList` Sheet → `subject_list` Table
 
 | Column | Header | What It Contains | Example |
-|--------|--------|-----------------|---------|
+| ------ | ------ | ---------------- | ------- |
 | A | UID (sorter) | Auto-generated unique ID | `20260101_001` |
 | B | Subject Code | Standard subject code | `MGMT10101` |
 | C | Subject Name | Full subject name | `Management and Marketing` |
@@ -189,8 +192,8 @@ These tables are populated automatically to build towards the final output sprea
 #### `teaching stream` Sheet → `teaching_stream` Table
 
 | Column | Header | What It Contains | Example |
-|--------|--------|-----------------|---------|
-| A | Lecturer Key | Auto-generated unique key | `MGMT10101|Semester 1|Jane Smith` |
+| ------ | ------ | ---------------- | ------- |
+| A | Lecturer Key | Auto-generated unique key | `MGMT10101\|Semester 1\|Jane Smith` |
 | B | Subject Code | Standard subject code | `MGMT10101` |
 | C | Study Period | Study period | `Semester 1` |
 | D | Lecturer | Lecturer name | `Jane Smith` |
@@ -201,8 +204,8 @@ These tables are populated automatically to build towards the final output sprea
 #### `AllSubjectsHTML` Sheet (Power Query)
 
 | Column | Header | What It Contains |
-|--------|--------|-----------------|
-| A | SubjectCode | Subject code|
+| ------ | ------ | ---------------- |
+| A | SubjectCode | Subject code |
 | B | URL | Handbook assessment page URL |
 | C | AssessmentTableHTML | Raw HTML of the assessment table |
 | D | HTMLLength | Character count of the HTML |
@@ -213,7 +216,7 @@ These tables are populated automatically to build towards the final output sprea
 ### Assessment Data → `assessment data parsed` Sheet
 
 | Column | Header | What It Contains |
-|--------|--------|-----------------|
+| ------ | ------ | ---------------- |
 | A | Subject Code | Subject code |
 | B | Study Period | Study period (or "All") |
 | C | Assessment Name | Name of the assessment |
@@ -229,13 +232,13 @@ These tables are populated automatically to build towards the final output sprea
 ### Required Parameters
 
 | Cell | Parameter | Description | Validation |
-|------|-----------|-------------|-----------|
+| ---- | --------- | ----------- | ---------- |
 | **C2** | Year | Academic year being processed | Must be a number ≥ 2025 |
 
 ### Optional Parameters
 
 | Cell | Parameter | Description | If Left Blank |
-|------|-----------|-------------|--------------|
+| ---- | --------- | ----------- | ------------- |
 | **C3** | Enrolment Tracker filename | Override default filename | Uses default filename |
 | **C5** | Teaching Matrix filename | Override default filename | Uses default filename |
 | **C8** | Word count benchmark | Words per hour rate | Defaults to 3000 |
@@ -252,7 +255,7 @@ The system produces a file like: `[YEAR] Marking Admin Support Calculations.xlsm
 This file contains two sheets:
 
 | Sheet | Contents |
-|-------|----------|
+| ----- | -------- |
 | **FHY Calculations** | First-half year subjects (Summer Term, Semester 1) |
 | **SHY Calculations** | Second-half year subjects (Winter Term, Semester 2) |
 
@@ -265,8 +268,8 @@ Each sheet has subjects organised by study period. Here is the full column break
 #### Subject Info (A–D)
 
 | Col | Section | | Description |
-|-----|---------|:-:|-------------|
-| A | UID | 🔒 | **Hidden** - can be used to filter, but recommended to just **search by subject code**)|
+| --- | ------- | :-: | ----------- |
+| A | UID | 🔒 | **Hidden** - can be used to filter, but recommended to just **search by subject code**) |
 | B | Subject Code | 🔒 | e.g., `MGMT10001` |
 | C | Study Period | 🔒 | e.g., `Semester 1` |
 | D | Enrolment | 🔒 | **Formula** — `INDEX/SUMPRODUCT` linking to the Enrolment Tracker on SharePoint to pull live enrolment count |
@@ -276,7 +279,7 @@ Each sheet has subjects organised by study period. Here is the full column break
 Columns E–H & J are locked because they contain formulas referencing the `assessment data parsed` sheet and handbook data. Editing them would break the automatic calculations.
 
 | Col | Section | | Description |
-|-----|---------|:-:|-------------|
+| --- | ------- | :-: | ----------- |
 | E | Assessment Details | 🔒 | Individual assessment details — looked up from the `assessment data parsed` sheet |
 | F | Word Count | 🔒 | Word count per assessment, parsed from handbook data |
 | G | Exam | 🔒 | Exam duration (`Y`/`N`), parsed from handbook data |
@@ -288,7 +291,7 @@ Columns E–H & J are locked because they contain formulas referencing the `asse
 #### Lecturer & Streams (L–S)
 
 | Col | Section | | Description |
-|-----|---------|:-:|-------------|
+| --- | ------- | :-: | ----------- |
 | L | Lecturer/Instructors | ✏️ | Lecturer names — auto-populated from teaching stream data, refreshable via the Refresh button |
 | M | Status | ✏️ | Staff status (`Continuing T&R` highlighted to indicate eligibility for marking support) — auto-populated from staff data |
 | N | Stream # | ✏️ | **Hidden** Stream number |
@@ -303,7 +306,7 @@ Columns E–H & J are locked because they contain formulas referencing the `asse
 Each subject has space for **3 markers**. Markers 2 (AD–AM) and 3 (AN–AW) follow the exact same 10-column structure as Marker 1 below.
 
 | Col | Section | | Description |
-|-----|---------|:-:|-------------|
+| --- | ------- | :-: | ----------- |
 | T | Marker 1 Name | ✏️ | **Manual Entry** — who is marking |
 | U | Assessment Details | ✏️ | **Manual Entry** — user-selected Assessment Details (column E), or self-defined marking arrangements (e.g. `Other Casual Academic Activity (2 hours per task)`) |
 | V | Word Count | ✏️ | **Formula** — `INDEX/MATCH` pulling the matching word count from column F |
@@ -387,9 +390,9 @@ These three settings need to be configured **once per computer** before first us
 > All three are **required**. Without them, macros might not run properly, enrolment numbers might not load, and calculations might not update.
 
 <details>
-<summary><strong>1. Enable VBA Macros</strong> — required for macros and LecturerRefresh export</summary>
+<summary>Windows Setup</summary>
 
-#### Windows
+#### 1. Enable VBA Macros
 
 1. Open Excel
 2. Go to **File** → **Options**
@@ -400,20 +403,7 @@ These three settings need to be configured **once per computer** before first us
 7. Also tick **Trust access to the VBA project object model** (required for the LecturerRefresh module to export into the calculation file)
 8. Click **OK** → **OK**
 
-#### Mac
-
-1. Open Excel
-2. Go to **Excel** (menu bar) → **Preferences**
-3. Click **Security & Privacy**
-4. Under **Macro Security**, select **Enable all macros**
-5. Close the preferences window
-
-</details>
-
-<details>
-<summary><strong>2. Enable External Links & Data Connections</strong> — required for enrolment numbers</summary>
-
-#### Windows
+#### 2. Enable External Links & Data Connections
 
 1. Open Excel
 2. Go to **File** → **Options**
@@ -424,22 +414,7 @@ These three settings need to be configured **once per computer** before first us
 7. Under **Security settings for Data Connections**, select **Enable all Data Connections**
 8. Click **OK** → **OK**
 
-#### Mac
-
-1. Open the workbook
-2. If you see a **Security Warning** bar at the top saying "Automatic update of links has been disabled", click **Enable Content**
-3. If prompted about data connections, click **Enable**
-4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
-
-> [!TIP]
-> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
-
-</details>
-
-<details>
-<summary><strong>3. Set Calculation Mode to Automatic</strong> — required for real-time formula updates</summary>
-
-#### Windows
+#### 3. Set Calculation Mode to Automatic
 
 1. Open Excel
 2. Go to the **Formulas** tab on the ribbon
@@ -452,7 +427,30 @@ Or via settings:
 2. Under **Calculation options**, set **Workbook Calculation** to **Automatic**
 3. Click **OK**
 
-#### Mac
+</details>
+
+<details>
+<summary>Mac Setup</summary>
+
+#### 1. Enable VBA Macros
+
+1. Open Excel
+2. Go to **Excel** (menu bar) → **Preferences**
+3. Click **Security & Privacy**
+4. Under **Macro Security**, select **Enable all macros**
+5. Close the preferences window
+
+#### 2. Enable External Links & Data Connections
+
+1. Open the workbook
+2. If you see a **Security Warning** bar at the top saying "Automatic update of links has been disabled", click **Enable Content**
+3. If prompted about data connections, click **Enable**
+4. For permanent trust: go to **Excel** → **Preferences** → **Security & Privacy** and ensure external content is allowed
+
+> [!TIP]
+> If enrolment numbers show as `0` or `#REF!` after opening, the link trust settings may not be enabled. Go to **Data** → **Edit Links** and click **Update Values** to force a refresh.
+
+#### 3. Set Calculation Mode to Automatic
 
 1. Open Excel
 2. Go to the **Formulas** tab on the ribbon
@@ -529,7 +527,7 @@ Or via preferences:
 ## Quick Reference Card
 
 | Action | How |
-|--------|-----|
+| ------ | --- |
 | Run the full process | Fill in Dashboard → Click Run button |
 | Stop a running process | Run `StopWorkflowMonitoring` macro |
 | Reset status after a crash | Run `ResetStatus` macro |

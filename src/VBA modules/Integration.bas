@@ -28,7 +28,7 @@ Public SilentMode As Boolean
 ' Called by: Dashboard "Generate" button
 '---------------------------------------------------------------
 Sub GenerateMarkingSupport()
-    Dim ws As Worksheet
+    Dim dashboardSheet As Worksheet
     Dim yearValue As String
     Dim yearNum As Long
     Dim enrolmentTracker As String
@@ -39,21 +39,23 @@ Sub GenerateMarkingSupport()
     ' Enable silent mode to suppress MsgBox in sub-modules
     SilentMode = True
     
-    ' Always keep screen updating ON
+    ' Keep screen updating ON so status cells remain visible
     Application.ScreenUpdating = True
     
-    ' Force Automatic calculation
+    ' Force automatic calc so formulas update in real time
     OriginalCalculationMode = Application.Calculation
     Application.Calculation = xlCalculationAutomatic
     
     StopMonitoring = False
-    Set ws = ThisWorkbook.Sheets("Dashboard")
+    Set dashboardSheet = ThisWorkbook.Sheets("Dashboard")
     startDateTime = Now
     
-    ' Update Dashboard timing cells
-    ws.Range("C15").Value = Format(Date, "yyyy-mm-dd")
-    ws.Range("C16").Value = Format(startDateTime, "HH:MM:SS")
-    With ws.Range("C17")
+    ' =========================================================================
+    ' TIMING DISPLAY — record start date/time, set live elapsed-time formula
+    ' =========================================================================
+    dashboardSheet.Range("C15").Value = Format(Date, "yyyy-mm-dd")
+    dashboardSheet.Range("C16").Value = Format(startDateTime, "HH:MM:SS")
+    With dashboardSheet.Range("C17")
         .ClearContents
         .Interior.ColorIndex = xlNone
         .Font.Color = RGB(0, 0, 0)
@@ -61,15 +63,15 @@ Sub GenerateMarkingSupport()
         .Formula = "=TEXT(NOW()-C16,""HH:MM:SS"")"
     End With
     
-    ws.Calculate
+    dashboardSheet.Calculate
     DoEvents
 
-    ClearStatusColumn ws
+    ClearStatusColumn dashboardSheet
     
-    ' Validate year input
+    ' Validate year input (must be 2025 or later)
     On Error Resume Next
-    yearNum = CLng(ws.Range("C2").Value)
-    If Err.Number <> 0 Or IsEmpty(ws.Range("C2").Value) Or yearNum < 2025 Then
+    yearNum = CLng(dashboardSheet.Range("C2").Value)
+    If Err.Number <> 0 Or IsEmpty(dashboardSheet.Range("C2").Value) Or yearNum < 2025 Then
         On Error GoTo 0
         MsgBox "Please enter a valid year (2025 or later)!", vbExclamation, "Invalid Year"
         SilentMode = False
@@ -80,16 +82,17 @@ Sub GenerateMarkingSupport()
     yearValue = CStr(yearNum)
     
     ' Read optional parameters
-    enrolmentTracker = GetOptionalValue(ws.Range("C3").Value)
-    teachingMatrix = GetOptionalValue(ws.Range("C5").Value)
-    emailValue = GetOptionalValue(ws.Range("C12").Value)
+    enrolmentTracker = GetOptionalValue(dashboardSheet.Range("C3").Value)
+    teachingMatrix = GetOptionalValue(dashboardSheet.Range("C5").Value)
+    emailValue = GetOptionalValue(dashboardSheet.Range("C12").Value)
     
-    ' START WORKFLOWS (calling extracted modules)
-    TriggerSubjectListWorkflow ws, yearValue, enrolmentTracker, emailValue
-    TriggerTeachingStreamWorkflow ws, yearValue, teachingMatrix, emailValue
+    ' =========================================================================
+    ' TRIGGER WORKFLOWS — Power Automate flows for Subject List and Teaching Stream
+    ' =========================================================================
+    TriggerSubjectListWorkflow dashboardSheet, yearValue, enrolmentTracker, emailValue
+    TriggerTeachingStreamWorkflow dashboardSheet, yearValue, teachingMatrix, emailValue
     
-    ' Start monitoring
-    MonitorAndExecute ws, emailValue
+    MonitorAndExecute dashboardSheet, emailValue
 End Sub
 
 '---------------------------------------------------------------
@@ -99,7 +102,7 @@ End Sub
 '          Times out after 30 minutes.
 ' Called by: GenerateMarkingSupport
 '---------------------------------------------------------------
-Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
+Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
     Dim maxWaitMinutes As Integer
     Dim startTime As Double
     Dim lastRefreshTime As Double
@@ -119,29 +122,31 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     MsgBox "Workflows triggered! Monitoring F2 and F5 for completion..." & vbCrLf & _
            "Press ESC or run 'StopWorkflowMonitoring' to stop.", vbInformation
     
-    ' MONITORING LOOP
+    ' =========================================================================
+    ' POLLING LOOP — check every 2s, force cloud sync every 5s
+    ' =========================================================================
     Do While Not StopMonitoring And Timer - startTime < (maxWaitMinutes * 60)
         DoEvents
         
-        ' Force cloud sync every 5 seconds
+        ' SharePoint sync needed so Office Scripts status updates appear locally
         If Timer - lastRefreshTime > refreshInterval Then
-            ForceCloudSync ws
+            ForceCloudSync dashboardSheet
             lastRefreshTime = Timer
         End If
         
-        ws.Calculate
+        dashboardSheet.Calculate
         DoEvents
         
-        ' Check Subject List Refresh completion (F2)
-        If Not subjectListComplete And CheckWorkflowComplete(ws, "F2") Then
+        ' Check if Subject List workflow completed (cell F2)
+        If Not subjectListComplete And CheckWorkflowComplete(dashboardSheet, "F2") Then
             subjectListComplete = True
             Application.StatusBar = "Subject List Refresh completed!"
             Debug.Print "Subject List Refresh Done"
             Application.Wait (Now + TimeValue("0:00:01"))
         End If
         
-        ' Check Teaching Stream Refresh completion (F5)
-        If Not teachingStreamComplete And CheckWorkflowComplete(ws, "F5") Then
+        ' Check if Teaching Stream workflow completed (cell F5)
+        If Not teachingStreamComplete And CheckWorkflowComplete(dashboardSheet, "F5") Then
             teachingStreamComplete = True
             Application.StatusBar = "Teaching Stream Refresh completed!"
             Debug.Print "Teaching Stream Refresh Done"
@@ -154,7 +159,7 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
             Exit Do
         End If
         
-        ' Periodic status update
+        ' Periodic status update — show which workflows are still pending
         If Int(Timer) Mod 10 < 2 Then
             Dim statusMsg As String
             statusMsg = "Monitoring: "
@@ -171,27 +176,28 @@ Sub MonitorAndExecute(ws As Worksheet, emailValue As String)
     
     Application.StatusBar = False
     
-    ' POST-MONITORING EXECUTION
+    ' =========================================================================
+    ' POST-MONITORING — run macros or handle timeout/cancellation
+    ' =========================================================================
     If Not StopMonitoring And subjectListComplete And teachingStreamComplete Then
-        ' Both workflows completed - run all macros
-        RunAllMacros ws, emailValue
-        FinalizeProcess ws, emailValue
+        RunAllMacros dashboardSheet, emailValue
+        FinalizeProcess dashboardSheet, emailValue
         
         MsgBox "All processes completed!" & vbCrLf & vbCrLf & _
-               "? Subject List Refresh: Complete" & vbCrLf & _
-               "? GenerateSubjectQueries: Complete" & vbCrLf & _
-               "? ParseAssessmentData: Complete" & vbCrLf & _
-               "? Teaching Stream Refresh: Complete" & vbCrLf & _
-               "? GenerateCalculationSheets: Complete", vbInformation
+               "✓ Subject List Refresh: Complete" & vbCrLf & _
+               "✓ GenerateSubjectQueries: Complete" & vbCrLf & _
+               "✓ ParseAssessmentData: Complete" & vbCrLf & _
+               "✓ Teaching Stream Refresh: Complete" & vbCrLf & _
+               "✓ GenerateCalculationSheets: Complete", vbInformation
         
     ElseIf StopMonitoring Then
         MsgBox "Monitoring stopped by user.", vbInformation
         
     Else
-        ' Timeout - run macros anyway
+        ' Timeout — proceed with whatever data is available
         MsgBox "Timeout reached. Running macros with current data...", vbExclamation
-        RunAllMacros ws, emailValue
-        FinalizeProcess ws, emailValue
+        RunAllMacros dashboardSheet, emailValue
+        FinalizeProcess dashboardSheet, emailValue
     End If
     
     ' Disable silent mode and restore calculation
@@ -205,29 +211,29 @@ End Sub
 '          SharePoint file changes between polling intervals
 ' Called by: MonitorAndExecute
 '---------------------------------------------------------------
-Sub ForceCloudSync(ws As Worksheet)
+Sub ForceCloudSync(dashboardSheet As Worksheet)
     On Error Resume Next
     
-    ' Disable alerts to bypass dialog boxes
+    ' Suppress save/refresh dialogue boxes
     Application.DisplayAlerts = False
     
     ThisWorkbook.Save
     ThisWorkbook.RefreshAll
     Application.Calculate
     Application.CalculateFullRebuild
-    ws.Calculate
-    ws.Range("F2:F6").Calculate
+    dashboardSheet.Calculate
+    dashboardSheet.Range("F2:F6").Calculate
     
-    ' Force cache refresh by reading values
+    ' Read values to flush any SharePoint cache
     Dim tempVal As Variant
-    tempVal = ws.Range("F2").Value
-    tempVal = ws.Range("F5").Value
+    tempVal = dashboardSheet.Range("F2").Value
+    tempVal = dashboardSheet.Range("F5").Value
     
+    ' Toggle screen updating to force visual refresh
     Application.ScreenUpdating = False
     Application.ScreenUpdating = True
     DoEvents
     
-    ' Re-enable alerts
     Application.DisplayAlerts = True
     
     On Error GoTo 0
@@ -240,14 +246,14 @@ End Sub
 ' Called by: MonitorAndExecute
 ' Returns: True if the workflow is complete
 '---------------------------------------------------------------
-Function CheckWorkflowComplete(ws As Worksheet, cellAddress As String) As Boolean
+Function CheckWorkflowComplete(dashboardSheet As Worksheet, cellAddress As String) As Boolean
     Dim cellValue As String
     
     DoEvents
-    cellValue = Trim(UCase(CStr(ws.Range(cellAddress).Value)))
+    cellValue = Trim(UCase(CStr(dashboardSheet.Range(cellAddress).Value)))
     
     If cellValue = "DONE" Or cellValue = "COMPLETE" Or cellValue = "FINISHED" Then
-        With ws.Range(cellAddress)
+        With dashboardSheet.Range(cellAddress)
             .Interior.Color = RGB(146, 208, 80)
             .Value = "Complete"
         End With
@@ -265,10 +271,10 @@ End Function
 '          Dashboard status cells along the way
 ' Called by: MonitorAndExecute
 '---------------------------------------------------------------
-Sub RunAllMacros(ws As Worksheet, emailValue As String)
+Sub RunAllMacros(dashboardSheet As Worksheet, emailValue As String)
     
-    ' Macro 1: GenerateSubjectQueries
-    With ws.Range("F3")
+    ' MACRO 1: GenerateSubjectQueries
+    With dashboardSheet.Range("F3")
         .Value = "Running..."
         .Interior.Color = RGB(255, 192, 0)
     End With
@@ -278,21 +284,22 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
     GenerateSubjectQueries
     On Error GoTo 0
     
+    ' Power Query is Windows-only — show "Skipped" on Mac
     #If Mac Then
-        With ws.Range("F3")
+        With dashboardSheet.Range("F3")
             .Value = "Skipped"
-            .Interior.Color = RGB(191, 191, 191) ' Grey
+            .Interior.Color = RGB(191, 191, 191)
         End With
     #Else
-        With ws.Range("F3")
+        With dashboardSheet.Range("F3")
             .Value = "Complete"
             .Interior.Color = RGB(146, 208, 80)
         End With
     #End If
     DoEvents
     
-    ' Macro 2: ParseAssessmentData
-    With ws.Range("F4")
+    ' MACRO 2: ParseAssessmentData
+    With dashboardSheet.Range("F4")
         .Value = "Running..."
         .Interior.Color = RGB(255, 192, 0)
     End With
@@ -302,14 +309,14 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
     ParseAssessmentData
     On Error GoTo 0
     
-    With ws.Range("F4")
+    With dashboardSheet.Range("F4")
         .Value = "Complete"
         .Interior.Color = RGB(146, 208, 80)
     End With
     DoEvents
     
-    ' Macro 3: GenerateCalculationSheets
-    With ws.Range("F6")
+    ' MACRO 3: GenerateCalculationSheets
+    With dashboardSheet.Range("F6")
         .Value = "Running..."
         .Interior.Color = RGB(255, 192, 0)
     End With
@@ -320,7 +327,7 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
     Application.Calculation = xlCalculationAutomatic
     On Error GoTo 0
     
-    With ws.Range("F6")
+    With dashboardSheet.Range("F6")
         .Value = "Complete"
         .Interior.Color = RGB(146, 208, 80)
     End With
@@ -328,19 +335,18 @@ Sub RunAllMacros(ws As Worksheet, emailValue As String)
 End Sub
 
 '---------------------------------------------------------------
-' FinalizeProcess
+' FinaliseProcess
 ' Purpose: Freeze the elapsed time display and send the
 '          completion email notification
 ' Called by: MonitorAndExecute
 '---------------------------------------------------------------
-Sub FinalizeProcess(ws As Worksheet, emailValue As String)
-    ' Freeze elapsed time
-    With ws.Range("C17")
+Sub FinaliseProcess(dashboardSheet As Worksheet, emailValue As String)
+    ' Freeze elapsed time — replace live formula with its current value
+    With dashboardSheet.Range("C17")
         .Value = .Value
     End With
     
-    ' Send email
-    SendCompletionNotification ws, emailValue
+    SendCompletionNotification dashboardSheet, emailValue
 End Sub
 
 '---------------------------------------------------------------
@@ -349,7 +355,7 @@ End Sub
 '          to the SharePoint output folder
 ' Called by: FinalizeProcess
 '---------------------------------------------------------------
-Sub SendCompletionNotification(ws As Worksheet, emailValue As String)
+Sub SendCompletionNotification(dashboardSheet As Worksheet, emailValue As String)
     On Error Resume Next
     
     Dim OutlookApp As Object
@@ -358,7 +364,7 @@ Sub SendCompletionNotification(ws As Worksheet, emailValue As String)
     
     If emailValue = "" Then Exit Sub
     
-    yearValue = ws.Range("C2").Value
+    yearValue = dashboardSheet.Range("C2").Value
     Set OutlookApp = CreateObject("Outlook.Application")
     
     If Not OutlookApp Is Nothing Then
@@ -389,10 +395,10 @@ End Sub
 Sub StopWorkflowMonitoring()
     StopMonitoring = True
     
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Dashboard")
+    Dim dashboardSheet As Worksheet
+    Set dashboardSheet = ThisWorkbook.Sheets("Dashboard")
     
-    With ws.Range("C17")
+    With dashboardSheet.Range("C17")
         .Value = "Stopped"
         .Font.Color = RGB(255, 0, 0)
         .Interior.ColorIndex = xlNone
@@ -411,10 +417,10 @@ End Sub
 ' Purpose: Clear all Dashboard status cells and restore defaults
 '---------------------------------------------------------------
 Sub ResetStatus()
-    Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("Dashboard")
+    Dim dashboardSheet As Worksheet
+    Set dashboardSheet = ThisWorkbook.Sheets("Dashboard")
     
-    ClearStatusColumn ws
+    ClearStatusColumn dashboardSheet
     StopMonitoring = False
     SilentMode = False
     Application.StatusBar = False
@@ -427,8 +433,8 @@ End Sub
 ' ClearStatusColumn
 ' Purpose: Clear cells F2:F6 on the Dashboard
 '---------------------------------------------------------------
-Sub ClearStatusColumn(ws As Worksheet)
-    With ws.Range("F2:F6")
+Sub ClearStatusColumn(dashboardSheet As Worksheet)
+    With dashboardSheet.Range("F2:F6")
         .Value = ""
         .Interior.ColorIndex = xlNone
     End With

@@ -74,6 +74,7 @@ Public Sub RefreshLecturerData()
     updateCount = 0
     
     ' STEP 1: Get parameters from source file
+    ' (sourceWb refers to "Auto handbook system.xlsm" on SharePoint)
     Application.StatusBar = "Reading parameters from source file..."
     
     Dim yearValue As String
@@ -86,11 +87,11 @@ Public Sub RefreshLecturerData()
         GoTo CleanExit
     End If
     
-    ' STEP 2: Trigger Workflow 3
+    ' STEP 2: Trigger Teaching Matrix workflow
     Application.StatusBar = "Triggering Teaching Matrix workflow..."
     
     If Not TriggerWorkflow3(yearValue, teachingMatrix, emailValue) Then
-        MsgBox "Failed to trigger Workflow 3." & vbCrLf & vbCrLf & _
+        MsgBox "Failed to trigger Teaching Matrix workflow." & vbCrLf & vbCrLf & _
                "Check your network connection and try again.", vbExclamation, "Workflow Error"
         GoTo CleanExit
     End If
@@ -99,12 +100,12 @@ Public Sub RefreshLecturerData()
            "Monitoring for completion... (usually <1 minute)" & vbCrLf & vbCrLf & _
            "Please wait while the workflow processes.", vbInformation, "Workflow Started"
     
-    ' STEP 3: Wait for Workflow 3 completion
+    ' STEP 3: Wait for Teaching Matrix workflow completion
     Application.StatusBar = "Waiting for Teaching Matrix workflow to complete..."
     
     If Not WaitForWorkflow3Completion(120) Then  ' 2 minute timeout
         Dim response As VbMsgBoxResult
-        response = MsgBox("Workflow 3 did not complete within 2 minutes." & vbCrLf & vbCrLf & _
+        response = MsgBox("Teaching Matrix workflow did not complete within 2 minutes." & vbCrLf & vbCrLf & _
                          "The workflow may still be running in the background." & vbCrLf & vbCrLf & _
                          "Continue refresh with potentially outdated data?", _
                          vbQuestion + vbYesNo, "Workflow Timeout")
@@ -179,38 +180,39 @@ Private Function GetSourceParameters(ByRef yearValue As String, ByRef teachingMa
     
     GetSourceParameters = False
     
-    Dim sourceWB As Workbook
-    Set sourceWB = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
+    ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
+    Dim sourceWb As Workbook
+    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
     
-    If sourceWB Is Nothing Then Exit Function
+    If sourceWb Is Nothing Then Exit Function
     
-    Dim ws As Worksheet
-    Set ws = sourceWB.Sheets("Dashboard")
+    Dim sourceSheet As Worksheet
+    Set sourceSheet = sourceWb.Sheets("Dashboard")
     
-    If Not ws Is Nothing Then
-        yearValue = Trim(CStr(ws.Range("C2").Value))
-        teachingMatrix = Trim(CStr(ws.Range("C5").Value))
-        emailValue = Trim(CStr(ws.Range("C12").Value))
+    If Not sourceSheet Is Nothing Then
+        yearValue = Trim(CStr(sourceSheet.Range("C2").Value))
+        teachingMatrix = Trim(CStr(sourceSheet.Range("C5").Value))
+        emailValue = Trim(CStr(sourceSheet.Range("C12").Value))
         
-        ' Year is required
+        ' Year is the only required parameter
         GetSourceParameters = (yearValue <> "" And IsNumeric(yearValue))
     End If
     
-    sourceWB.Close SaveChanges:=False
+    sourceWb.Close SaveChanges:=False
     
     On Error GoTo 0
 End Function
 
 '---------------------------------------------------------------
-' TriggerWorkflow3
+' TriggerTeachingMatrixWorkflow
 ' Purpose: Send HTTP POST to the Power Automate endpoint with
 '          year/teaching matrix/email parameters
 ' Returns: True if request succeeded
 '---------------------------------------------------------------
-Private Function TriggerWorkflow3(yearValue As String, teachingMatrix As String, emailValue As String) As Boolean
+Private Function TriggerTeachingMatrixWorkflow(yearValue As String, teachingMatrix As String, emailValue As String) As Boolean
     On Error GoTo ErrorHandler
     
-    TriggerWorkflow3 = False
+    TriggerTeachingMatrixWorkflow = False
     
     ' Build JSON payload
     Dim jsonData As String
@@ -227,23 +229,23 @@ Private Function TriggerWorkflow3(yearValue As String, teachingMatrix As String,
         result = SendRequestWindows(WORKFLOW3_URL, jsonData)
     #End If
     
-    TriggerWorkflow3 = (result <> "ERROR")
+    TriggerTeachingMatrixWorkflow = (result <> "ERROR")
     Exit Function
     
 ErrorHandler:
-    TriggerWorkflow3 = False
+    TriggerTeachingMatrixWorkflow = False
 End Function
 
 '---------------------------------------------------------------
-' WaitForWorkflow3Completion
+' WaitForTeachingMatrixWorkflowCompletion
 ' Purpose: Poll the source Dashboard F5 cell every 3 seconds
 '          until it shows DONE/COMPLETE/FINISHED or timeout
 ' Returns: True if workflow completed
 '---------------------------------------------------------------
-Private Function WaitForWorkflow3Completion(maxWaitSeconds As Long) As Boolean
+Private Function WaitForTeachingMatrixWorkflowCompletion(maxWaitSeconds As Long) As Boolean
     On Error Resume Next
     
-    WaitForWorkflow3Completion = False
+    WaitForTeachingMatrixWorkflowCompletion = False
     
     Dim startTime As Double
     Dim elapsedTime As Double
@@ -295,35 +297,36 @@ Private Function WaitForWorkflow3Completion(maxWaitSeconds As Long) As Boolean
 End Function
 
 '---------------------------------------------------------------
-' GetWorkflow3Status
+' GetTeachingMatrixWorkflowStatus
 ' Purpose: Open source file read-only and read the current
 '          workflow status from Dashboard F5
 ' Returns: Status string (e.g. "DONE", "Not Started")
 '---------------------------------------------------------------
-Private Function GetWorkflow3Status() As String
+Private Function GetTeachingMatrixWorkflowStatus() As String
     On Error Resume Next
     
-    GetWorkflow3Status = "Unknown"
+    GetTeachingMatrixWorkflowStatus = "Unknown"
     
-    Dim sourceWB As Workbook
-    Set sourceWB = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
+    ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
+    Dim sourceWb As Workbook
+    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
     
-    If Not sourceWB Is Nothing Then
-        Dim ws As Worksheet
-        Set ws = sourceWB.Sheets("Dashboard")
+    If Not sourceWb Is Nothing Then
+        Dim sourceSheet As Worksheet
+        Set sourceSheet = sourceWb.Sheets("Dashboard")
         
-        If Not ws Is Nothing Then
+        If Not sourceSheet Is Nothing Then
             Dim cellValue As String
-            cellValue = Trim(CStr(ws.Range("F5").Value))
+            cellValue = Trim(CStr(sourceSheet.Range("F5").Value))
             
             If cellValue <> "" Then
-                GetWorkflow3Status = cellValue
+                GetTeachingMatrixWorkflowStatus = cellValue
             Else
-                GetWorkflow3Status = "Not Started"
+                GetTeachingMatrixWorkflowStatus = "Not Started"
             End If
         End If
         
-        sourceWB.Close SaveChanges:=False
+        sourceWb.Close SaveChanges:=False
     End If
     
     On Error GoTo 0
@@ -418,26 +421,26 @@ End Function
 Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
     On Error Resume Next
     
-    Dim ws As Worksheet
-    For Each ws In wb.Worksheets
-        If ws.name = "FHY Calculations" Or ws.name = "SHY Calculations" Then
-            ws.Unprotect
+    Dim calcSheet As Worksheet
+    For Each calcSheet In wb.Worksheets
+        If calcSheet.name = "FHY Calculations" Or calcSheet.name = "SHY Calculations" Then
+            calcSheet.Unprotect
             
             Dim lastRow As Long
-            lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+            lastRow = calcSheet.Cells(calcSheet.Rows.Count, "A").End(xlUp).Row
             
             Dim i As Long
-            i = 4  ' Start from row 4
+            i = 4  ' Start from row 4 (the first possible subject header)
             
             Do While i <= lastRow
                 Dim uid As String
-                uid = ws.Cells(i, 1).Value
+                uid = calcSheet.Cells(i, 1).Value
                 
-                ' Check for header row (UID ends with _0)
+                ' Header rows have UIDs ending in "_0" (e.g. "MGMT20001_Semester 1_0")
                 If Len(uid) > 2 And Right(uid, 2) = "_0" Then
                     ' Create SubjectBlockInfo as array
                     Dim blockInfo(0 To 6) As Variant
-                    blockInfo(SBI_SHEETNAME) = ws.name
+                    blockInfo(SBI_SHEETNAME) = calcSheet.name
                     blockInfo(SBI_HEADERROW) = i
                     
                     ' Parse UID for subject code and study period
@@ -457,7 +460,6 @@ Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
                         ' Calculate number of assessment rows
                         blockInfo(SBI_NUMASSESSMENTROWS) = blockInfo(SBI_TOTALROW) - blockInfo(SBI_HEADERROW) - 1
                         
-                        ' Store subject block info
                         subjectBlocks.add blockInfo
                         
                         ' Jump to next subject
@@ -468,7 +470,7 @@ Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
                 i = i + 1
             Loop
         End If
-    Next ws
+    Next calcSheet
     
     On Error GoTo 0
 End Sub
@@ -486,41 +488,42 @@ End Sub
 Private Function LoadTeachingStreamData(sourcePath As String) As Variant
     On Error GoTo ErrorHandler
     
-    Dim sourceWB As Workbook
-    Set sourceWB = Workbooks.Open(sourcePath, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
+    ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
+    Dim sourceWb As Workbook
+    Set sourceWb = Workbooks.Open(sourcePath, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
     
-    If sourceWB Is Nothing Then
+    If sourceWb Is Nothing Then
         LoadTeachingStreamData = Empty
         Exit Function
     End If
     
-    Dim ws As Worksheet
-    Set ws = sourceWB.Sheets(TEACHING_STREAM_SHEET)
+    Dim sourceSheet As Worksheet
+    Set sourceSheet = sourceWb.Sheets(TEACHING_STREAM_SHEET)
     
-    If ws Is Nothing Then
-        sourceWB.Close SaveChanges:=False
+    If sourceSheet Is Nothing Then
+        sourceWb.Close SaveChanges:=False
         LoadTeachingStreamData = Empty
         Exit Function
     End If
     
     Dim lastRow As Long
-    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+    lastRow = sourceSheet.Cells(sourceSheet.Rows.Count, "B").End(xlUp).Row
     
     If lastRow < 2 Then
-        sourceWB.Close SaveChanges:=False
+        sourceWb.Close SaveChanges:=False
         LoadTeachingStreamData = Empty
         Exit Function
     End If
     
-    ' Load columns B-G (Subject Code, Study Period, Lecturer, Status, Activity Code, Streams)
-    LoadTeachingStreamData = ws.Range(ws.Cells(2, 2), ws.Cells(lastRow, 7)).Value
+    ' Columns B–G: Subject Code, Study Period, Lecturer, Status, Activity Code, Streams
+    LoadTeachingStreamData = sourceSheet.Range(sourceSheet.Cells(2, 2), sourceSheet.Cells(lastRow, 7)).Value
     
-    sourceWB.Close SaveChanges:=False
+    sourceWb.Close SaveChanges:=False
     Exit Function
     
 ErrorHandler:
     On Error Resume Next
-    If Not sourceWB Is Nothing Then sourceWB.Close SaveChanges:=False
+    If Not sourceWb Is Nothing Then sourceWb.Close SaveChanges:=False
     On Error GoTo 0
     LoadTeachingStreamData = Empty
 End Function
@@ -548,21 +551,20 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
         Dim blockInfo As Variant
         blockInfo = subjectBlocks(i)
         
-        Dim ws As Worksheet
-        Set ws = wb.Sheets(CStr(blockInfo(SBI_SHEETNAME)))
-        ws.Unprotect
+        Dim calcSheet As Worksheet
+        Set calcSheet = wb.Sheets(CStr(blockInfo(SBI_SHEETNAME)))
+        calcSheet.Unprotect
         
-        ' Extract to String variables first (Mac-safe type casting)
+        ' Mac-safe type casting — Variant→String before passing to match function
         Dim blockSubjectCode As String
         Dim blockStudyPeriod As String
         blockSubjectCode = CStr(blockInfo(SBI_SUBJECTCODE))
         blockStudyPeriod = CStr(blockInfo(SBI_STUDYPERIOD))
         
-        ' Get fresh lecturers for this subject (returns array)
+        ' Get updated lecturers for this subject (returns array)
         Dim freshLecturers As Variant
         freshLecturers = GetLecturersFromTeachingData(teachingData, blockSubjectCode, blockStudyPeriod)
         
-        ' Check if we got any lecturers
         Dim lecturerCount As Long
         lecturerCount = 0
         
@@ -573,7 +575,6 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
         End If
         
         If lecturerCount > 0 Then
-            ' Calculate available rows and Total row position
             Dim headerRow As Long
             Dim totalRow As Long
             Dim firstLecturerRow As Long
@@ -584,33 +585,33 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
             firstLecturerRow = headerRow + 1
             availableRows = totalRow - firstLecturerRow  ' Rows between header and Total
             
-            ' Check if we need to add rows
+            ' =========================================================================
+            ' INSERT ROWS — add rows before Total if more lecturers than available slots
+            ' =========================================================================
             If lecturerCount > availableRows Then
                 Dim rowsToAdd As Long
                 rowsToAdd = lecturerCount - availableRows
                 
-                ' Insert rows just before Total row
                 Dim insertRow As Long
                 Dim j As Long
                 
                 For j = 1 To rowsToAdd
-                    insertRow = totalRow  ' Always insert at current Total row position
-                    ws.Rows(insertRow).Insert Shift:=xlDown
+                    insertRow = totalRow
+                    calcSheet.Rows(insertRow).Insert Shift:=xlDown
                     
-                    ' Copy format from the row above (last lecturer row)
-                    ws.Rows(insertRow - 1).Copy
-                    ws.Rows(insertRow).PasteSpecial xlPasteFormats
+                    ' Copy formatting from the row above to keep consistent styling
+                    calcSheet.Rows(insertRow - 1).Copy
+                    calcSheet.Rows(insertRow).PasteSpecial xlPasteFormats
                     Application.CutCopyMode = False
                     
-                    ' Clear contents but keep formatting
-                    ws.Rows(insertRow).ClearContents
+                    calcSheet.Rows(insertRow).ClearContents
                     
                     ' Generate UID for new row
                     Dim newUID As String
                     Dim uidSuffix As Long
                     uidSuffix = (insertRow - headerRow - 1)
                     newUID = blockSubjectCode & "_" & blockStudyPeriod & "_" & uidSuffix
-                    ws.Cells(insertRow, 1).Value = newUID
+                    calcSheet.Cells(insertRow, 1).Value = newUID
                     
                     ' Update Total row position (it shifted down)
                     totalRow = totalRow + 1
@@ -620,7 +621,9 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
                 availableRows = totalRow - firstLecturerRow
             End If
             
-            ' Clear columns L-O for all lecturer rows (between header and Total)
+            ' =========================================================================
+            ' CLEAR OLD DATA — columns L–O only; columns P–S are user-edited
+            ' =========================================================================
             Dim Row As Long
             For Row = firstLecturerRow To totalRow - 1
                 ws.Cells(Row, 12).ClearContents  ' Column L: Lecturer Name
@@ -630,33 +633,35 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
                 ' Columns P-S are NOT touched (preserve user edits)
             Next Row
             
-            ' Write fresh lecturer data to columns L-O
-            Dim currentRow As Long
-            currentRow = firstLecturerRow
+            ' =========================================================================
+            ' WRITE FRESH DATA — populate lecturer columns from teaching stream
+            ' =========================================================================
+            Dim outputRow As Long
+            outputRow = firstLecturerRow
             
             Dim k As Long
             For k = 1 To lecturerCount
-                If currentRow < totalRow Then
-                    ws.Cells(currentRow, 12).Value = freshLecturers(k, 0)  ' Name
-                    ws.Cells(currentRow, 13).Value = freshLecturers(k, 1)  ' Status
-                    ws.Cells(currentRow, 14).Value = freshLecturers(k, 3)  ' Streams
-                    ws.Cells(currentRow, 15).Value = freshLecturers(k, 2)  ' Activity Code
+                If outputRow < totalRow Then
+                    calcSheet.Cells(outputRow, 12).Value = freshLecturers(k, 0)  ' Name
+                    calcSheet.Cells(outputRow, 13).Value = freshLecturers(k, 1)  ' Status
+                    calcSheet.Cells(outputRow, 14).Value = freshLecturers(k, 3)  ' Streams
+                    calcSheet.Cells(outputRow, 15).Value = freshLecturers(k, 2)  ' Activity Code
                     
-                    ' Bold first lecturer (coordinator)
-                    If currentRow = firstLecturerRow Then
-                        ws.Cells(currentRow, 12).Font.Bold = True
+                    ' Bold first lecturer (subject coordinator)
+                    If outputRow = firstLecturerRow Then
+                        calcSheet.Cells(outputRow, 12).Font.Bold = True
                     End If
                     
-                    currentRow = currentRow + 1
+                    outputRow = outputRow + 1
                 End If
             Next k
             
-            Call ApplyLecturerFormulas(ws, headerRow, totalRow)
+            Call ApplyLecturerFormulas(calcSheet, headerRow, totalRow)
             
             UpdateAllLecturers = UpdateAllLecturers + 1
         End If
         
-        ws.Protect DrawingObjects:=False, Contents:=True, Scenarios:=False, _
+        calcSheet.Protect DrawingObjects:=False, Contents:=True, Scenarios:=False, _
                    AllowFormattingCells:=True, AllowFormattingColumns:=True, AllowFormattingRows:=True
     Next i
     
@@ -670,7 +675,7 @@ End Function
 '          lecturer rows in a subject block
 ' Called by: UpdateAllLecturers
 '---------------------------------------------------------------
-Private Sub ApplyLecturerFormulas(ws As Worksheet, headerRow As Long, totalRow As Long)
+Private Sub ApplyLecturerFormulas(calcSheet As Worksheet, headerRow As Long, totalRow As Long)
     On Error Resume Next
     
     Dim firstLecturerRow As Long
@@ -683,28 +688,26 @@ Private Sub ApplyLecturerFormulas(ws As Worksheet, headerRow As Long, totalRow A
     
     If numLecturers <= 0 Then Exit Sub
     
-    ' Build formula arrays for batch write (faster than row-by-row)
+    ' Build formula arrays for batch write
     Dim formulas As Variant
     ReDim formulas(1 To numLecturers, 1 To 2)
     
-    Dim currentRow As Long
+    Dim outputRow As Long
     Dim i As Long
     
     i = 1
-    For currentRow = firstLecturerRow To lastLecturerRow
+    For outputRow = firstLecturerRow To lastLecturerRow
         ' Column Q (17): Allocated Marking
-        ' =IF(M[row]="Continuing T&R",N[row]*VALUE(LEFT($Q$2,FIND(" ",$Q$2)-1)),"")
-        formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
+        formulas(i, 1) = "=IF(M" & outputRow & "=""Continuing T&R"",N" & outputRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
         
         ' Column R (18): Marking Support Hours Available
-        ' =IF(Q[row]="","",$J$[totalRow]*(P[row]/D[headerRow])-Q[row])
-        formulas(i, 2) = "=IF(Q" & currentRow & "="""","""",$J$" & totalRow & "*(P" & currentRow & "/D" & headerRow & ")-Q" & currentRow & ")"
+        formulas(i, 2) = "=IF(Q" & outputRow & "="""","""",$J$" & totalRow & "*(P" & outputRow & "/D" & headerRow & ")-Q" & outputRow & ")"
         
         i = i + 1
-    Next currentRow
+    Next outputRow
     
-    ' Batch write both formulas at once (columns Q & R = 17-18)
-    ws.Cells(firstLecturerRow, 17).Resize(numLecturers, 2).Formula = formulas
+    ' Batch write both formula columns at once
+    calcSheet.Cells(firstLecturerRow, 17).Resize(numLecturers, 2).Formula = formulas
     
     On Error GoTo 0
 End Sub
@@ -719,29 +722,30 @@ End Sub
 '          from the header row
 ' Returns: Row number of the Total row
 '---------------------------------------------------------------
-Private Function FindTotalRow(ws As Worksheet, headerRow As Long) As Long
+Private Function FindTotalRow(calcSheet As Worksheet, headerRow As Long) As Long
     Dim Row As Long
-    For Row = headerRow + 1 To ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    For Row = headerRow + 1 To calcSheet.Cells(calcSheet.Rows.Count, "A").End(xlUp).Row
         Dim uid As String
         Dim cellE As String
         
-        uid = ws.Cells(Row, 1).Value
-        cellE = Trim(CStr(ws.Cells(Row, 5).Value))
+        uid = calcSheet.Cells(Row, 1).Value
+        cellE = Trim(CStr(calcSheet.Cells(Row, 5).Value))
         
-        ' Found Total row
+        ' Find Total row
         If cellE = "Total" Then
             FindTotalRow = Row
             Exit Function
         End If
         
-        ' Hit next subject header
+        ' Hit next subject header — Total row must be just above
         If Len(uid) > 2 And Right(uid, 2) = "_0" Then
             FindTotalRow = Row - 1
             Exit Function
         End If
     Next Row
     
-    FindTotalRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    ' Fallback — last used row
+    FindTotalRow = calcSheet.Cells(calcSheet.Rows.Count, "A").End(xlUp).Row
 End Function
 
 '---------------------------------------------------------------
@@ -750,30 +754,29 @@ End Function
 '          next subject header or category header)
 ' Returns: Row number of the last row in the block
 '---------------------------------------------------------------
-Private Function FindLastSubjectRow(ws As Worksheet, headerRow As Long) As Long
+Private Function FindLastSubjectRow(calcSheet As Worksheet, headerRow As Long) As Long
     Dim Row As Long
-    For Row = headerRow + 1 To ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    For Row = headerRow + 1 To calcSheet.Cells(calcSheet.Rows.Count, "A").End(xlUp).Row
         Dim nextUID As String
         Dim cellB As String
         
-        nextUID = ws.Cells(Row, 1).Value
-        cellB = Trim(CStr(ws.Cells(Row, 2).Value))
+        nextUID = calcSheet.Cells(Row, 1).Value
+        cellB = Trim(CStr(calcSheet.Cells(Row, 2).Value))
         
-        ' Next subject header found
         If Len(nextUID) > 2 And Right(nextUID, 2) = "_0" Then
             FindLastSubjectRow = Row - 1
             Exit Function
         End If
         
-        ' Category header found
+        ' Category headers (SUMMER, WINTER, etc.) mark block boundaries
         If (cellB = "SUMMER" Or cellB = "WINTER" Or cellB = "SEMESTER 1" Or cellB = "SEMESTER 2") And _
-           Trim(CStr(ws.Cells(Row, 1).Value)) = "" Then
+           Trim(CStr(calcSheet.Cells(Row, 1).Value)) = "" Then
             FindLastSubjectRow = Row - 1
             Exit Function
         End If
     Next Row
     
-    FindLastSubjectRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    FindLastSubjectRow = calcSheet.Cells(calcSheet.Rows.Count, "A").End(xlUp).Row
 End Function
 
 '---------------------------------------------------------------

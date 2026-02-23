@@ -25,21 +25,23 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     // Cast input to proper type
     const subjects: SubjectRecord[] = subjectData as SubjectRecord[];
 
-    // Get the SubjectList worksheet
+    // =========================================================================
+    // INITIALISE — locate sheet and table
+    // =========================================================================
     const ws = workbook.getWorksheet("SubjectList");
     if (!ws) {
       throw new Error("Worksheet 'SubjectList' not found.");
     }
     console.log("Worksheet 'SubjectList' found.");
 
-    // Get table by name
     const table = ws.getTable("subject_list");
     if (!table) {
       throw new Error("Table 'subject_list' not found in worksheet 'SubjectList'.");
     }
     console.log("Table 'subject_list' found.");
 
-    // Helper function to find JSON property by keyword (handles line breaks and whitespace in headers)
+    // Power Automate JSON headers can contain line breaks, so normalise
+    // whitespace before matching
     const findJsonProperty = (obj: SubjectRecord, keyword: string): string => {
       const normalizedKeyword = keyword.toLowerCase().replace(/\s+/g, ' ').trim();
       for (const key in obj) {
@@ -51,7 +53,9 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
       return "";
     };
 
-    // Build output rows
+    // =========================================================================
+    // BUILD OUTPUT ROWS — extract fields and apply exclusion rules
+    // =========================================================================
     console.log("Building output rows...");
     const outputRows: (string | number | boolean)[][] = [];
 
@@ -75,7 +79,10 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
       // Generate handbook URL
       const handbookURL: string = `https://handbook.unimelb.edu.au/${year}/subjects/${subjectCode.toLowerCase()}/assessment`;
 
-      // Apply exclude rules
+      // =====================================================================
+      // EXCLUSION RULES — subjects matching any rule are flagged, not removed,
+      // so the user can override individual exclusions in column J
+      // =====================================================================
       let isExcluded: boolean = false;
 
       // Rule 1: Exclude if subject code contains FNCE, ACCT, or ECON
@@ -124,7 +131,9 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
 
     console.log(`Built ${outputRows.length} output rows.`);
 
-    // === NEW APPROACH: Use table.resize() to match data size ===
+    // =========================================================================
+    // RESIZE TABLE — match table dimensions to data before writing values
+    // =========================================================================
     const currentRowCount = table.getRowCount();
     console.log(`Current row count: ${currentRowCount}, Target: ${outputRows.length}`);
 
@@ -135,7 +144,7 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
 
     // Calculate new range based on data
     const headerRowRange = table.getHeaderRowRange();
-    const startAddress = headerRowRange.getAddress().split(':')[0]; // e.g., "A1"
+    const startAddress = headerRowRange.getAddress().split(':')[0];
 
     // Parse start address to get column and row
     const startMatch = startAddress.match(/([A-Z]+)(\d+)/);
@@ -149,32 +158,30 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     // Get last column from table (assumes 10 columns: A through J)
     const columnCount = table.getColumns().length;
     const endCol = String.fromCharCode(startCol.charCodeAt(0) + columnCount - 1);
+    const endRow = startRow + outputRows.length;
 
-    // Calculate end row (header row + data rows)
-    const endRow = startRow + outputRows.length; // Header + all data rows
-
-    // Build new range address
     const newRangeAddress = `${startCol}${startRow}:${endCol}${endRow}`;
     console.log(`Resizing table to: ${newRangeAddress}`);
 
-    // Resize the table to match the data
     const newRange = ws.getRange(newRangeAddress);
     table.resize(newRange);
     console.log(`Table resized successfully to ${outputRows.length} rows.`);
 
-    // Now write all data
+    // =========================================================================
+    // WRITE DATA
+    // =========================================================================
     console.log(`Writing ${outputRows.length} rows to table...`);
     const dataRange = table.getRangeBetweenHeaderAndTotal();
     dataRange.setValues(outputRows);
     console.log(`Successfully wrote all data to table.`);
 
-    // Set hyperlinks for Handbook Link column (column index 8, 0-indexed)
+    // Hyperlinks are non-critical — errors here should not fail the script
     try {
       console.log("Setting hyperlinks...");
       const linkValues = dataRange.getValues();
 
       for (let r = 0; r < linkValues.length; r++) {
-        const cell = dataRange.getCell(r, 8); // Handbook Link is column 8 (0-indexed)
+        const cell = dataRange.getCell(r, 8);
         const url = linkValues[r][8] as string;
         if (url) {
           cell.setHyperlink({ textToDisplay: url, address: url });
@@ -184,7 +191,6 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     } catch (linkError) {
       const linkErrMsg = linkError instanceof Error ? linkError.message : JSON.stringify(linkError);
       console.log(`Warning: Error setting hyperlinks: ${linkErrMsg}`);
-      // Don't throw - hyperlinks are not critical
     }
 
     console.log(`Successfully processed ${subjects.length} subject records.`);

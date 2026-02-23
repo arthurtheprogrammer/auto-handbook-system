@@ -21,27 +21,27 @@
 '---------------------------------------------------------------
 Sub GenerateSubjectQueries()
     Dim wb As Workbook
-    Dim ws As Worksheet
-    Dim tbl As ListObject
+    Dim htmlSheet As Worksheet
+    Dim subjectsTable As ListObject
     
     Set wb = ThisWorkbook
     
     ' Check if the worksheet exists
     On Error Resume Next
-    Set ws = wb.Worksheets("AllSubjectsHTML")
+    Set htmlSheet = wb.Worksheets("AllSubjectsHTML")
     On Error GoTo 0
     
-    If ws Is Nothing Then
+    If htmlSheet Is Nothing Then
         If Not SilentMode Then MsgBox "Worksheet 'AllSubjectsHTML' not found."
         Exit Sub
     End If
     
     ' Check if the table exists
     On Error Resume Next
-    Set tbl = ws.ListObjects("AllSubjectsHTML")
+    Set subjectsTable = htmlSheet.ListObjects("AllSubjectsHTML")
     On Error GoTo 0
     
-    If tbl Is Nothing Then
+    If subjectsTable Is Nothing Then
         If Not SilentMode Then MsgBox "Table 'AllSubjectsHTML' not found on the worksheet."
         Exit Sub
     End If
@@ -63,8 +63,8 @@ Sub GenerateSubjectQueries()
         DoEvents
         Application.StatusBar = False
         
-        ' Still format existing data
-        Call FormatTableCleanup(ws, tbl)
+        ' Format existing data
+        Call FormatTableCleanup(htmlSheet, subjectsTable)
         Exit Sub
     #End If
     
@@ -74,12 +74,12 @@ Sub GenerateSubjectQueries()
     Application.StatusBar = "Refreshing AllSubjectsHTML query..."
     
     On Error Resume Next
-    ' Try to refresh via QueryTable first
-    If Not tbl.QueryTable Is Nothing Then
-        tbl.QueryTable.BackgroundQuery = False
-        tbl.QueryTable.Refresh BackgroundQuery:=False
+    ' Try QueryTable refresh
+    If Not subjectsTable.QueryTable Is Nothing Then
+        subjectsTable.QueryTable.BackgroundQuery = False
+        subjectsTable.QueryTable.Refresh BackgroundQuery:=False
     Else
-        ' Target specific Power Query connection by name
+        ' Fall back to named connection if QueryTable is unavailable
         Dim conn As WorkbookConnection
         Dim connFound As Boolean
         connFound = False
@@ -102,16 +102,15 @@ Sub GenerateSubjectQueries()
     
     Application.StatusBar = False
     
-    ' Format the table
-    Call FormatTableCleanup(ws, tbl)
+    Call FormatTableCleanup(htmlSheet, subjectsTable)
     
     ' =========================================================================
-    ' POST-REFRESH STATUS CHECK
+    ' POST-REFRESH STATUS CHECK — report success/failure counts to user
     ' =========================================================================
     If Not SilentMode Then
         Dim statusCol As Range
         On Error Resume Next
-        Set statusCol = tbl.ListColumns("Status").DataBodyRange
+        Set statusCol = subjectsTable.ListColumns("Status").DataBodyRange
         On Error GoTo 0
         
         If Not statusCol Is Nothing Then
@@ -149,65 +148,62 @@ End Sub
 '          date formats, header styling, and freeze panes
 ' Called by: GenerateSubjectQueries
 '---------------------------------------------------------------
-Sub FormatTableCleanup(ws As Worksheet, Optional tbl As ListObject = Nothing)
-    ' Clean up table formatting: standard row heights, no text wrap, autofit columns
-    ' Similar to Office Script reset formatting functionality
-    
+Sub FormatTableCleanup(htmlSheet As Worksheet, Optional subjectsTable As ListObject = Nothing)
     On Error Resume Next
     
     Dim usedRange As Range
-    Set usedRange = ws.usedRange
+    Set usedRange = htmlSheet.usedRange
     
     If usedRange Is Nothing Then Exit Sub
     
-    ' Disable text wrapping for all cells
+    ' =========================================================================
+    ' ROW AND COLUMN SIZING — standardise dimensions for readability
+    ' =========================================================================
     usedRange.WrapText = False
-    
-    ' Set all rows to standard height (15 points)
-    ' First autofit to ensure content visibility, then standardize
     usedRange.Rows.AutoFit
     usedRange.Rows.RowHeight = 15
+    htmlSheet.Columns.AutoFit
     
-    ' Autofit columns for readability
-    ws.Columns.AutoFit
+    ' URL and HTML columns set with extra width to show full content
+    htmlSheet.Columns("B:C").ColumnWidth = 70
     
-    ' Set specific column widths for columns B and C (URL and HTML columns)
-    ws.Columns("B:C").ColumnWidth = 70
-    
-    ' Optional: Set maximum column width for other columns to prevent excessive widths
+    ' Cap remaining columns to prevent excessively wide sheets
     Dim col As Long
-    For col = 4 To usedRange.Columns.Count ' Start from column D onwards
-        If ws.Columns(col).ColumnWidth > 50 Then
-            ws.Columns(col).ColumnWidth = 50
+    For col = 4 To usedRange.Columns.Count
+        If htmlSheet.Columns(col).ColumnWidth > 50 Then
+            htmlSheet.Columns(col).ColumnWidth = 50
         End If
     Next col
     
-    ' Hyperlink column B cells with their own URL values
-    If Not tbl Is Nothing Then
+    ' =========================================================================
+    ' HYPERLINKS — make URL column clickable for quick handbook access
+    ' =========================================================================
+    If Not subjectsTable Is Nothing Then
         Dim urlCol As Range
-        Set urlCol = tbl.ListColumns("URL").DataBodyRange
+        Set urlCol = subjectsTable.ListColumns("URL").DataBodyRange
         
         Dim cell As Range
         For Each cell In urlCol
             If cell.Value <> "" And Not IsEmpty(cell.Value) Then
-                ' Remove existing hyperlink if present
+                ' Clear old hyperlink first to avoid duplicates
                 If cell.Hyperlinks.Count > 0 Then
                     cell.Hyperlinks(1).Delete
                 End If
-                ' Add hyperlink
-                ws.Hyperlinks.add Anchor:=cell, Address:=cell.Value, TextToDisplay:=cell.Value
+                htmlSheet.Hyperlinks.add Anchor:=cell, Address:=cell.Value, TextToDisplay:=cell.Value
             End If
         Next cell
     End If
     
-    ' Center align columns D and E (HTMLLength and Status)
-    ws.Columns("D:E").HorizontalAlignment = xlCenter
+    ' =========================================================================
+    ' ALIGNMENT AND DATE FORMATTING
+    ' =========================================================================
+    htmlSheet.Columns("D:E").HorizontalAlignment = xlCenter
     
-    ' Format FetchTime column (column G) to YYYY-MM-DD HH:MM:SS
-    If Not tbl Is Nothing Then
+    ' Format FetchTime to ISO-style for consistency across locales
+    If Not subjectsTable Is Nothing Then
         On Error Resume Next
         Dim timeCol As Range
-        Set timeCol = tbl.ListColumns("FetchTime").DataBodyRange
+        Set timeCol = subjectsTable.ListColumns("FetchTime").DataBodyRange
         
         If Not timeCol Is Nothing Then
             timeCol.NumberFormat = "yyyy-mm-dd hh:mm:ss"
@@ -215,39 +211,38 @@ Sub FormatTableCleanup(ws As Worksheet, Optional tbl As ListObject = Nothing)
         On Error GoTo 0
     End If
     
-    ' If table was provided, ensure header row is slightly taller
-    If Not tbl Is Nothing Then
-        tbl.HeaderRowRange.RowHeight = 18
-        tbl.HeaderRowRange.Font.Bold = True
+    ' =========================================================================
+    ' HEADER STYLING — taller header row with Olive Green theme
+    ' =========================================================================
+    If Not subjectsTable Is Nothing Then
+        subjectsTable.HeaderRowRange.RowHeight = 18
+        subjectsTable.HeaderRowRange.Font.Bold = True
         
-        ' Left align all headers first
-        tbl.HeaderRowRange.HorizontalAlignment = xlLeft
+        ' Left-align all headers, then selectively centre numeric columns
+        subjectsTable.HeaderRowRange.HorizontalAlignment = xlLeft
         
-        ' Then center align only columns D and E headers
         On Error Resume Next
-        tbl.ListColumns("HTMLLength").Range.Cells(1).HorizontalAlignment = xlCenter
-        tbl.ListColumns("Status").Range.Cells(1).HorizontalAlignment = xlCenter
+        subjectsTable.ListColumns("HTMLLength").Range.Cells(1).HorizontalAlignment = xlCenter
+        subjectsTable.ListColumns("Status").Range.Cells(1).HorizontalAlignment = xlCenter
         On Error GoTo 0
         
-        tbl.HeaderRowRange.VerticalAlignment = xlCenter
-        
-        ' Apply Olive Green Medium table style (TableStyleMedium4)
-        tbl.TableStyle = "TableStyleMedium4"
+        subjectsTable.HeaderRowRange.VerticalAlignment = xlCenter
+        subjectsTable.TableStyle = "TableStyleMedium4"
     End If
     
-    ' Set standard formatting for all cells
+    ' Ensure content cells are top-aligned for multi-line HTML previews
     With usedRange
         .VerticalAlignment = xlTop
     End With
     
-    ' Reset horizontal alignment for columns that aren't specifically centered
-    ws.Columns("A:A").HorizontalAlignment = xlLeft ' SubjectCode
-    ws.Columns("F:F").HorizontalAlignment = xlLeft ' ErrorMessage
+    ' Override centre-alignment for text-heavy columns
+    htmlSheet.Columns("A:A").HorizontalAlignment = xlLeft  ' SubjectCode
+    htmlSheet.Columns("F:F").HorizontalAlignment = xlLeft  ' ErrorMessage
     
-    ' Freeze the header row if table exists
-    If Not tbl Is Nothing Then
-        ws.Activate
-        ws.Range("A2").Select
+    ' Freeze header so column names stay visible while scrolling
+    If Not subjectsTable Is Nothing Then
+        htmlSheet.Activate
+        htmlSheet.Range("A2").Select
         ActiveWindow.FreezePanes = True
     End If
     
