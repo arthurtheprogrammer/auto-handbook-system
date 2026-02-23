@@ -1191,29 +1191,16 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     End If
     
     ' QUEUE marker formulas for batch processing (don't execute yet)
-    Dim markerInfo(0 To 4) As Variant
-    markerInfo(0) = subjectStartRow
-    markerInfo(1) = subjectEndRow
-    markerInfo(2) = 1  ' Marker number
-    markerInfo(3) = subjectCode
-    markerInfo(4) = studyPeriod
-    markerFormulaQueue.add markerInfo
-    
-    Dim markerInfo2(0 To 4) As Variant
-    markerInfo2(0) = subjectStartRow
-    markerInfo2(1) = subjectEndRow
-    markerInfo2(2) = 2
-    markerInfo2(3) = subjectCode
-    markerInfo2(4) = studyPeriod
-    markerFormulaQueue.add markerInfo2
-    
-    Dim markerInfo3(0 To 4) As Variant
-    markerInfo3(0) = subjectStartRow
-    markerInfo3(1) = subjectEndRow
-    markerInfo3(2) = 3
-    markerInfo3(3) = subjectCode
-    markerInfo3(4) = studyPeriod
-    markerFormulaQueue.add markerInfo3
+    Dim mk As Integer
+    For mk = 1 To 3
+        Dim markerInfo(0 To 4) As Variant
+        markerInfo(0) = subjectStartRow
+        markerInfo(1) = subjectEndRow
+        markerInfo(2) = mk
+        markerInfo(3) = subjectCode
+        markerInfo(4) = studyPeriod
+        markerFormulaQueue.add markerInfo
+    Next mk
     
     ' Add checkboxes
     Call SetContractDropdown(wsOutput, subjectStartRow, 1)
@@ -2166,53 +2153,34 @@ Sub AddRefreshButtonsToSheets(wb As Workbook)
     
     Dim calcSheet As Worksheet
     Dim btn As Button
+    Dim sheetNames As Variant
+    sheetNames = Array("FHY Calculations", "SHY Calculations")
     
-    ' FHY Calculations sheet
-    On Error Resume Next
-    Set calcSheet = wb.Sheets("FHY Calculations")
-    On Error GoTo ErrorHandler
-    
-    If Not calcSheet Is Nothing Then
+    Dim s As Integer
+    For s = LBound(sheetNames) To UBound(sheetNames)
+        Set calcSheet = Nothing
         On Error Resume Next
-        calcSheet.Buttons.Delete
-        Err.Clear
+        Set calcSheet = wb.Sheets(sheetNames(s))
         On Error GoTo ErrorHandler
         
-        Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
-                                  calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
-        
-        With btn
-            .OnAction = "RefreshLecturerData"
-            .Caption = "Refresh Lecturer Data"
-            .name = "RefreshButton"
-        End With
-        
-        LogMessage "Added refresh button to FHY Calculations at L2"
-    End If
-    
-    ' SHY Calculations sheet
-    Set calcSheet = Nothing
-    On Error Resume Next
-    Set calcSheet = wb.Sheets("SHY Calculations")
-    On Error GoTo ErrorHandler
-    
-    If Not calcSheet Is Nothing Then
-        On Error Resume Next
-        calcSheet.Buttons.Delete
-        Err.Clear
-        On Error GoTo ErrorHandler
-        
-        Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
-                                  calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
-        
-        With btn
-            .OnAction = "RefreshLecturerData"
-            .Caption = "Refresh Lecturer Data"
-            .name = "RefreshButton"
-        End With
-        
-        LogMessage "Added refresh button to SHY Calculations at L2"
-    End If
+        If Not calcSheet Is Nothing Then
+            On Error Resume Next
+            calcSheet.Buttons.Delete
+            Err.Clear
+            On Error GoTo ErrorHandler
+            
+            Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
+                                      calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
+            
+            With btn
+                .OnAction = "RefreshLecturerData"
+                .Caption = "Refresh Lecturer Data"
+                .name = "RefreshButton"
+            End With
+            
+            LogMessage "Added refresh button to " & sheetNames(s) & " at L2"
+        End If
+    Next s
     
     Exit Sub
     

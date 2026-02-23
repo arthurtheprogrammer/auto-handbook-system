@@ -471,56 +471,75 @@ Or via preferences:
 
 ### "Please enter a valid year" error
 
-- **Cause**: Cell C2 on the Dashboard is empty or contains text
-- **Fix**: Enter a number like `2026` in cell C2
+**Cause:** Cell C2 on the Dashboard is empty or contains text.
+
+**Fix:** Enter a number like `2026` in cell C2.
+
+---
 
 ### Process gets stuck at "Running..."
 
-- **Cause**: The cloud workflow didn't report back as complete
-- **Fix**:
-  1. Check your internet connection
-  2. Wait a few more minutes (sometimes SharePoint syncs slowly)
-  3. If stuck for >10 minutes, run `StopWorkflowMonitoring` and try again
+**Cause:** The cloud workflow didn't report back as complete.
+
+**Fix:**
+
+1. Check your internet connection
+2. Wait a few more minutes (sometimes SharePoint syncs slowly)
+3. If stuck for >10 minutes, run `StopWorkflowMonitoring` and try again
+
+---
 
 ### Assessment data shows "Failed" for many subjects
 
-- **Cause**: The handbook year may not be published yet, or the year in C2 is wrong
-- **Fix**:
-  1. Check that the year in C2 matches an existing handbook year
-  2. Try opening one of the handbook URLs manually in your browser to verify
+**Cause:** The handbook year may not be published yet, or the year in C2 is wrong.
+
+**Fix:**
+
+1. Check that the year in C2 matches an existing handbook year
+2. Try opening one of the handbook URLs manually in your browser to verify
+
+---
 
 ### "Required sheets are missing" error
 
-- **Cause**: One of the data sheets was renamed or deleted
-- **Fix**: Ensure these sheets exist with **exactly** these names:
-  - `Dashboard`
-  - `SubjectList`
-  - `assessment data parsed`
-  - `teaching stream`
+**Cause:** One of the data sheets was renamed or deleted.
+
+**Fix:** Ensure these sheets exist with **exactly** these names: `Dashboard`, `SubjectList`, `assessment data parsed`, `teaching stream`.
+
+---
 
 ### Lecturer Refresh button doesn't work
 
-- **Cause**: The source workbook path may have changed
-- **Fix**: Contact the developer to update the file path in the macro
+**Cause:** The source workbook path may have changed.
+
+**Fix:** Contact the developer to update the file path in the macro.
+
+---
 
 ### Changes to the Enrolment Tracker or Teaching Matrix aren't reflected
 
-- **Cause**: The system pulls fresh data each run, but file names must match
-- **Fix**:
-  1. Make sure the filename in C3/C5 matches the actual file on SharePoint
-  2. If you renamed the file, update C3/C5 accordingly
+**Cause:** The system pulls fresh data each run, but file names must match.
+
+**Fix:**
+
+1. Make sure the filename in C3/C5 matches the actual file on SharePoint
+2. If you renamed the file, update C3/C5 accordingly
+
+---
 
 ### Something broke and you're not sure why
 
-- **Cause**: SharePoint folders may have been moved/renamed, or sheet/table/column names were changed
-- **Fix** — run through this checklist:
-  1. **File locations**: Confirm the Enrolment Tracker and Teaching Matrix files are still in the `TEACHING MATRIX & ENROLMENT TRACKER` folder on SharePoint and haven't been moved or renamed
-  2. **SharePoint paths**: If folders were reorganised, the VBA file paths and Power Automate flow URLs may need updating — contact the developer
-  3. **Sheet names**: Verify these sheets exist with exact names: `Dashboard`, `SubjectList`, `assessment data parsed`, `teaching stream`, `AllSubjectsHTML`
-  4. **Source workbook table names**: Verify: `subject_list`, `teaching_stream`, `AllSubjectsHTML`, `progress_bar`
-  5. **Enrolment Tracker table names**: Verify: `Enrolment_Tracker`, `Enrolment_Number`
-  6. **Teaching Matrix table names**: Verify: `Teaching_Data`, `Staff_table`
-  7. **Column headers**: Ensure no column headers have been renamed in the source files — the scripts match by keyword (see [Source Files](#source-files-what-you-maintain) for the exact keywords)
+**Cause:** SharePoint folders may have been moved/renamed, or sheet/table/column names were changed.
+
+**Fix** — run through this checklist:
+
+1. **File locations** — Confirm the Enrolment Tracker and Teaching Matrix files are still in the `TEACHING MATRIX & ENROLMENT TRACKER` folder on SharePoint and haven't been moved or renamed
+2. **SharePoint paths** — If folders were reorganised, the VBA file paths and Power Automate flow URLs may need updating — contact the developer
+3. **Sheet names** — Verify these sheets exist with exact names: `Dashboard`, `SubjectList`, `assessment data parsed`, `teaching stream`, `AllSubjectsHTML`
+4. **Source workbook table names** — Verify: `subject_list`, `teaching_stream`, `AllSubjectsHTML`, `progress_bar`
+5. **Enrolment Tracker table names** — Verify: `Enrolment_Tracker`, `Enrolment_Number`
+6. **Teaching Matrix table names** — Verify: `Teaching_Data`, `Staff_table`
+7. **Column headers** — Ensure no column headers have been renamed in the source files — the scripts match by keyword (see [Source Files](#source-files-what-you-maintain) for the exact keywords)
 
 ---
 
