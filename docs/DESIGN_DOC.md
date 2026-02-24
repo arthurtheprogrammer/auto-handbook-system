@@ -139,7 +139,7 @@ flowchart TD
 | **1. Cloud Data Extraction** | VBA triggers Power Automate flows → Office Scripts read SharePoint Excel files → write structured data to workbook tables |
 | **2. Web Scraping** | Power Query fetches assessment HTML from `handbook.unimelb.edu.au` for every subject in the subject list |
 | **3. VBA Data Processing** | VBA parses raw HTML into structured assessment records (name, word count, exam type, group size) |
-| **4. Output Generation** | VBA cross-references all data sources, generates FHY/SHY calculation sheets, exports to standalone workbook with embedded lecturer refresh |
+| **4. Output Generation** | VBA cross-references all data sources, generates FHY/SHY calculation sheets, exports to standalone workbook with embedded lecturer refresh function |
 
 ### Design Tradeoffs
 
@@ -169,13 +169,13 @@ The chosen approach meets users where they already are — inside Excel — with
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
-| **Phase 1** | Subject list extraction — Power Automate flow + Office Script to parse Enrolment Tracker into `subject_list` table | ✓ |
-| **Phase 2** | Teaching stream extraction — Power Automate flow + Office Script to parse Teaching Matrix into `teaching_stream` table | ✓ |
-| **Phase 3** | Assessment web scraping — Power Query to fetch handbook HTML; VBA to parse into structured assessment records | ✓ |
-| **Phase 4** | Output generation — VBA to generate FHY/SHY calculation sheets with formulas, protection, and formatting | ✓ |
-| **Phase 5** | Export & refresh — Export standalone `.xlsm` with embedded `LecturerRefresh.bas` for mid-semester updates | ✓ |
-| **Phase 6** | Cross-platform support — Mac compatibility for all VBA modules (conditional compilation, AppleScript HTTP) | ✓ |
-| **Phase 7** | Documentation — User Guide, Developer Guide, and this Design Document | ✓ |
+| **1** | Subject list extraction — Power Automate flow + Office Script to parse Enrolment Tracker into `subject_list` table | ✓ |
+| **2** | Teaching stream extraction — Power Automate flow + Office Script to parse Teaching Matrix into `teaching_stream` table | ✓ |
+| **3** | Assessment web scraping — Power Query to fetch handbook HTML; VBA to parse into structured assessment records | ✓ |
+| **4** | Output generation — VBA to generate FHY/SHY calculation sheets with formulas, protection, and formatting | ✓ |
+| **5** | Export & refresh — Export standalone `.xlsm` with embedded `LecturerRefresh.bas` for mid-semester updates | ✓ |
+| **6** | Cross-platform support — Mac compatibility for all VBA modules (conditional compilation, AppleScript HTTP) | ✓ |
+| **7** | Documentation — User Guide, Developer Guide, and this Design Document | ✓ |
 
 ---
 
