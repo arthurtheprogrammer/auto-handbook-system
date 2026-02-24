@@ -1,12 +1,12 @@
 # Excel temp/lock files
 ~$*.xls*
 
+# Sensitive workbooks (if applicable)
+*.xlsm
+*.xlsx
+
 # macOS
 .DS_Store
 
 # Windows
 Thumbs.db
-
-# Sensitive workbooks (if applicable)
-*.xlsm
-*.xlsx
