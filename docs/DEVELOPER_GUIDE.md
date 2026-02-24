@@ -24,8 +24,8 @@ The system has **4 processing layers** that execute in sequence:
 ```mermaid
 flowchart TD
     subgraph L1["Layer 1: Cloud Data Extraction"]
-        PA1["Power Automate Flow 1\n(Subject List)"]
-        PA2["Power Automate Flow 2\n(Teaching Stream)"]
+        PA1["Power Automate Flow 1<br/>(Subject List)"]
+        PA2["Power Automate Flow 2<br/>(Teaching Stream)"]
         OS1["subjectListParser.osts"]
         OS2["teachingStreamParser.osts"]
         PA1 --> OS1
@@ -33,18 +33,18 @@ flowchart TD
     end
 
     subgraph L2["Layer 2: Web Scraping"]
-        PQ["AllSubjectsHTML\n(Power Query)"]
+        PQ["AllSubjectsHTML<br/>(Power Query)"]
     end
 
     subgraph L3["Layer 3: VBA Data Processing"]
-        HQ["HTMLQuery.bas\n(refresh query)"]
-        AD["AssessmentData.bas\n(parse HTML)"]
+        HQ["HTMLQuery.bas<br/>(refresh query)"]
+        AD["AssessmentData.bas<br/>(parse HTML)"]
     end
 
     subgraph L4["Layer 4: Output Generation"]
-        CS["CalculationSheets.bas\n(FHY + SHY sheets)"]
+        CS["CalculationSheets.bas<br/>(FHY + SHY sheets)"]
         EXP["Export to new .xlsm"]
-        LR["LecturerRefresh.bas\n(in exported file)"]
+        LR["LecturerRefresh.bas<br/>(in exported file)"]
     end
 
     L1 --> L2
