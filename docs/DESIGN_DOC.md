@@ -43,7 +43,7 @@ A compounding problem was the **lack of any structured schema** in the existing 
 ### Who Is Affected
 
 | Stakeholder | Pain Point |
-|-------------|-----------|
+| ----------- | ---------- |
 | Department administrator | Spends 40+ hrs/semester on manual data collection, calculations, and cross-referencing |
 | Subject coordinators | Receive workload calculations that may contain transcription errors |
 | Casual academic markers | Contract arrangements depend on accurate marking hour calculations |
@@ -56,7 +56,7 @@ A compounding problem was the **lack of any structured schema** in the existing 
 ### Key Results (OKRs)
 
 | Objective | Key Result |
-|-----------|----------|
+| --------- | ---------- |
 | **Automate semester workload calculations** | Reduce manual data collection from ~40 hrs → <10 min per run |
 | **Eliminate data entry errors** | 100% of subject/assessment data sourced programmatically |
 | **Enable mid-semester updates** | Lecturer data refreshable via one-click button in exported file |
@@ -66,7 +66,7 @@ A compounding problem was the **lack of any structured schema** in the existing 
 ### Measurable Impact
 
 | Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
+| ------ | ------ | ----- | ----------- |
 | **Time per run** | ~40 hours manual | <10 minutes automated | **99.6% reduction** |
 | **Annual time saved** | 80+ hours/year (×2 semesters) | ~20 minutes/year | **80+ hours reclaimed** |
 | **Data accuracy** | Manual transcription across 150+ subjects | 100% programmatic sourcing | **Eliminates human error** |
@@ -87,7 +87,7 @@ A compounding problem was the **lack of any structured schema** in the existing 
 ## Technical Requirements
 
 | Requirement | Detail |
-|-------------|--------|
+| ----------- | ------ |
 | **Cross-platform** | Runs on both Mac and Windows (team uses both) |
 | **SharePoint integration** | Source files live on SharePoint; the system must read from and write to SharePoint-hosted Excel files |
 | **Web scraping** | Assessment data must be scraped from `handbook.unimelb.edu.au` (no API available) |
@@ -106,8 +106,8 @@ The system is a **4-layer data pipeline** that executes sequentially:
 ```mermaid
 flowchart TD
     subgraph L1["Layer 1: Cloud Data Extraction"]
-        PA1["Power Automate Flow 1\n(Subject List)"]
-        PA2["Power Automate Flow 2\n(Teaching Stream)"]
+        PA1["Power Automate Flow 1<br/>(Subject List)"]
+        PA2["Power Automate Flow 2<br/>(Teaching Stream)"]
         OS1["subjectListParser.osts"]
         OS2["teachingStreamParser.osts"]
         PA1 --> OS1
@@ -115,18 +115,18 @@ flowchart TD
     end
 
     subgraph L2["Layer 2: Web Scraping"]
-        PQ["AllSubjectsHTML\n(Power Query)"]
+        PQ["AllSubjectsHTML<br/>(Power Query)"]
     end
 
-    subgraph L3["Layer 3: VBA Data Processing"]
-        HQ["HTMLQuery.bas\n(refresh query)"]
-        AD["AssessmentData.bas\n(parse HTML)"]
+    subgraph L3["Layer 3: VBA Processing"]
+        HQ["HTMLQuery.bas<br/>(refresh query)"]
+        AD["AssessmentData.bas<br/>(parse HTML)"]
     end
 
     subgraph L4["Layer 4: Output Generation"]
-        CS["CalculationSheets.bas\n(FHY + SHY sheets)"]
+        CS["CalculationSheets.bas<br/>(FHY + SHY sheets)"]
         EXP["Export to new .xlsm"]
-        LR["LecturerRefresh.bas\n(in exported file)"]
+        LR["LecturerRefresh.bas<br/>(in exported file)"]
     end
 
     L1 --> L2
@@ -135,7 +135,7 @@ flowchart TD
 ```
 
 | Layer | What Happens |
-|-------|-------------|
+| ----- | ------------ |
 | **1. Cloud Data Extraction** | VBA triggers Power Automate flows → Office Scripts read SharePoint Excel files → write structured data to workbook tables |
 | **2. Web Scraping** | Power Query fetches assessment HTML from `handbook.unimelb.edu.au` for every subject in the subject list |
 | **3. VBA Data Processing** | VBA parses raw HTML into structured assessment records (name, word count, exam type, group size) |
@@ -144,7 +144,7 @@ flowchart TD
 ### Design Tradeoffs
 
 | Decision | Chosen Approach | Alternative Considered | Rationale |
-|----------|----------------|----------------------|-----------|
+| -------- | --------------- | ---------------------- | --------- |
 | **VBA over Python/Node** | VBA macros embedded in Excel | Standalone Python script | Users already work in Excel; no installation required; cross-platform macro support; output is naturally an Excel file |
 | **Power Automate over direct API** | Cloud flows with HTTP triggers | SharePoint REST API calls from VBA | Avoids OAuth complexity; Office Scripts run server-side with full Excel API; team can inspect and maintain flows visually |
 | **Power Query for web scraping** | M language query in Excel | VBA HTTP requests + string parsing | Native Excel integration; handles concurrent requests; results cached in a table; refresh is a single operation |
@@ -156,6 +156,7 @@ flowchart TD
 ### Why Not a Web App or Cloud-Only Solution?
 
 The team's workflow is **Excel-centric**. The Enrolment Tracker, Teaching Matrix, and all downstream outputs are Excel files on SharePoint. Building a web app would require:
+
 - New infrastructure (hosting, authentication, database)
 - User training on a new interface
 - Migration of downstream workflows that consume the Excel output
@@ -167,7 +168,7 @@ The chosen approach meets users where they already are — inside Excel — with
 ## Execution Plan
 
 | Phase | Scope | Status |
-|-------|-------|--------|
+| ----- | ----- | ------ |
 | **Phase 1** | Subject list extraction — Power Automate flow + Office Script to parse Enrolment Tracker into `subject_list` table | ✅ Complete |
 | **Phase 2** | Teaching stream extraction — Power Automate flow + Office Script to parse Teaching Matrix into `teaching_stream` table | ✅ Complete |
 | **Phase 3** | Assessment web scraping — Power Query to fetch handbook HTML; VBA to parse into structured assessment records | ✅ Complete |
@@ -181,6 +182,6 @@ The chosen approach meets users where they already are — inside Excel — with
 ## Future Considerations
 
 | Opportunity | Description |
-|-------------|-------------|
+| ----------- | ----------- |
 | **Scheduled automation** | Power Automate could trigger the entire pipeline on a schedule (e.g., start of each semester) rather than requiring a manual button click |
 | **Historical trend analysis** | Archiving outputs across years could enable workload trend reporting (e.g., marking hours growth by subject area) |
