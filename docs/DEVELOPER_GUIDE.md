@@ -57,7 +57,7 @@ flowchart TD
 When `GenerateMarkingSupport()` is called:
 
 | Step | Module | What Happens |
-|------|--------|-------------|
+| ---- | ------ | ------------ |
 | 1 | `Integration.bas` | Sets `SilentMode = True`, reads Dashboard params, validates year |
 | 2 | `SubjectListRefresh.bas` | HTTP POST to Power Automate → triggers `subjectListParser.osts` → populates `SubjectList` table |
 | 3 | `TeachingStreamRefresh.bas` | HTTP POST to Power Automate → triggers `teachingStreamParser.osts` → populates `teaching_stream` table |
@@ -74,6 +74,7 @@ When `GenerateMarkingSupport()` is called:
 ### Layer 1: Cloud Data Extraction
 
 **Power Automate Flows** are triggered via HTTP POST from VBA. Each flow:
+
 1. Reads a SharePoint Excel file (Enrolment Tracker or Teaching Matrix)
 2. Extracts relevant data as JSON
 3. Passes JSON to an Office Script in the target workbook
@@ -85,7 +86,7 @@ When `GenerateMarkingSupport()` is called:
 #### Flow 1: Subject List Refresh
 
 | Property | Value |
-|----------|-------|
+| -------- | ----- |
 | Trigger | HTTP POST from `SubjectListRefresh.bas` |
 | Source | Enrolment Tracker (`.xlsx`) on SharePoint |
 | Script | `subjectListParser.osts` |
@@ -97,7 +98,7 @@ When `GenerateMarkingSupport()` is called:
 #### Flow 2: Teaching Stream Refresh
 
 | Property | Value |
-|----------|-------|
+| -------- | ----- |
 | Trigger | HTTP POST from `TeachingStreamRefresh.bas` |
 | Source | Teaching Matrix (`.xlsx`) on SharePoint — uses **two** Excel Online (Business) connections |
 | Script | `teachingStreamParser.osts` |
@@ -110,6 +111,7 @@ When `GenerateMarkingSupport()` is called:
 ### Layer 2: Web Scraping (Power Query)
 
 The `AllSubjectsHTML` Power Query:
+
 1. Reads subject codes from a `Parameters` table in the workbook
 2. Constructs URLs: `https://handbook.unimelb.edu.au/{year}/subjects/{code}/assessment`
 3. Fetches HTML for each subject
@@ -119,12 +121,14 @@ The `AllSubjectsHTML` Power Query:
 ### Layer 3: VBA Data Processing
 
 **HTMLQuery.bas** (`GenerateSubjectQueries`):
+
 - **Mac**: Detects via `#If Mac Then`, skips refresh with user warning, formats existing data only
 - **Windows**: Refreshes via `tbl.QueryTable` or targeted `wb.Connections` lookup (avoids `RefreshAll`)
 - Formats columns, sets hyperlinks, applies table style
 - Post-refresh status check: counts success/failed rows (shown only when run individually, suppressed by `SilentMode`)
 
 **AssessmentData.bas** (`ParseAssessmentData`):
+
 - Reads raw HTML from `AllSubjectsHTML` table
 - Parses assessment details (name, word count, exam type, group size, quantity)
 - Writes structured records to `assessment data parsed` sheet
@@ -133,6 +137,7 @@ The `AllSubjectsHTML` Power Query:
 ### Layer 4: Output Generation
 
 **CalculationSheets.bas** (`GenerateCalculationSheets`):
+
 - Filters subjects by grouped period (FHY/SHY) and exclusion rules
 - Cross-references with assessment data and teaching stream data
 - Generates calculation sheets with benchmarks (word count/hr, exams/hr, marking support hrs/stream)
@@ -141,6 +146,7 @@ The `AllSubjectsHTML` Power Query:
 - **Sheet protection**: `Protect` is called with `AllowFormattingCells/Columns/Rows = True`, `AllowInsertingRows = False`, `AllowDeletingRows = False`, no password. Locked columns: **A–J** and **Q–R**
 
 **Auto-exclusion rules** (applied by `subjectListParser.osts` during subject list generation):
+
 - Subject code contains `FNCE`, `ACCT`, or `ECON`
 - Subject name contains "indigenous" or "indigenising"
 - Last 5 characters of subject code are not numeric
@@ -153,7 +159,7 @@ The `AllSubjectsHTML` Power Query:
 ### Integration.bas (Orchestrator)
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `GenerateMarkingSupport()` | Main entry point. Sets SilentMode, validates params, triggers workflows, monitors, runs macros |
 | `MonitorAndExecute()` | Polling loop that watches F2/F5 for completion, then calls `RunAllMacros` |
 | `RunAllMacros()` | Sequential execution: HTMLQuery → AssessmentData → CalculationSheets |
@@ -165,6 +171,7 @@ The `AllSubjectsHTML` Power Query:
 | `ResetStatus()` | Clears all status cells and resets state |
 
 **Global Variables:**
+
 - `Public SilentMode As Boolean` — suppresses MsgBox in sub-modules during integrated runs
 - `Public StopMonitoring As Boolean` — flag to abort the monitoring loop
 - `Public OriginalCalculationMode As XlCalculation` — saved calc mode for restoration
@@ -172,28 +179,28 @@ The `AllSubjectsHTML` Power Query:
 ### SubjectListRefresh.bas
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `RefreshSubjectList()` | Standalone entry point (validates year, triggers workflow, shows MsgBox) |
 | `TriggerSubjectListWorkflow()` | HTTP POST to Power Automate endpoint (called by Integration or standalone) |
 
 ### TeachingStreamRefresh.bas
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `RefreshTeachingStream()` | Standalone entry point |
 | `TriggerTeachingStreamWorkflow()` | HTTP POST to Power Automate endpoint |
 
 ### HTMLQuery.bas
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `GenerateSubjectQueries()` | Mac detection → Power Query refresh (targeted connection) → format → post-refresh status check |
 | `FormatTableCleanup()` | Standardizes row heights, column widths, hyperlinks, table style |
 
 ### AssessmentData.bas
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `ParseAssessmentData()` | Main parser: reads HTML → writes structured assessment records |
 | `SetupHeaders()` | Creates column headers on target sheet |
 | `ExtractAssessmentDetails()` | Parses individual assessment entries from HTML |
@@ -202,7 +209,7 @@ The `AllSubjectsHTML` Power Query:
 ### CalculationSheets.bas
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `GenerateCalculationSheets()` | Main entry: creates FHY + SHY sheets, exports workbook |
 | `GenerateSheet()` | Creates one calculation sheet (FHY or SHY) |
 | `PopulateSheetData()` | Fills in subject data, assessments, formulas |
@@ -214,7 +221,7 @@ The `AllSubjectsHTML` Power Query:
 ### LecturerRefresh.bas (Exported File Only)
 
 | Function | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `RefreshLecturerData()` | Main entry: reads source params → triggers Workflow 3 → waits → updates lecturer columns |
 | `GetSourceParameters()` | Opens source workbook read-only, reads C2/C5/C12 |
 | `TriggerWorkflow3()` | HTTP POST to Power Automate (Teaching Stream endpoint) |
@@ -231,7 +238,7 @@ The `AllSubjectsHTML` Power Query:
 ### Workbook Sheets
 
 | Sheet Name | Table Name | Purpose | Created By |
-|-----------|-----------|---------|-----------|
+| ---------- | ---------- | ------- | ---------- |
 | `Dashboard` | `progress_bar`, `Parameters` | User inputs, status tracking, benchmarks | Manual |
 | `SubjectList` | `subject_list` | Filtered subject data from Enrolment Tracker | `subjectListParser.osts` |
 | `AllSubjectsHTML` | `AllSubjectsHTML` | Raw assessment HTML scraped from handbook | Power Query |
@@ -244,7 +251,7 @@ The `AllSubjectsHTML` Power Query:
 ### External SharePoint Files
 
 | File | Location | Purpose |
-|------|----------|---------|
+| ---- | -------- | ------- |
 | Enrolment Tracker (`.xlsx`) | `/TEACHING MATRIX & ENROLMENT TRACKER/` | Source of subject codes, names, coordinators, study periods |
 | Teaching Matrix (`.xlsx`) | `/TEACHING MATRIX & ENROLMENT TRACKER/` | Source of lecturer assignments, activity codes, stream counts |
 | Automated Handbook Data System (`.xlsm`) | `/TEACHING SUPPORT/Handbook (.../Auto Handbook System/` | The main workbook containing all the macros |
@@ -252,7 +259,7 @@ The `AllSubjectsHTML` Power Query:
 **SharePoint identifiers** (hardcoded in Power Automate flows):
 
 | Item | Value |
-|------|-------|
+| ---- | ----- |
 | Site Group ID | `ad6c8e15-4773-48f0-a918-df5ce6b5a0ec` |
 | Source files path | `/Shared Documents/TEACHING MATRIX & ENROLMENT TRACKER/` |
 | Target workbook path | `/Shared Documents/TEACHING SUPPORT/Handbook (.../Auto Handbook System/Automated Handbook Data System.xlsm` |
@@ -260,7 +267,7 @@ The `AllSubjectsHTML` Power Query:
 ### Required Table Names (Do Not Rename)
 
 | File | Table Name | Used By |
-|------|------------|---------|
+| ---- | ---------- | ------- |
 | Enrolment Tracker | `Enrolment_Tracker` | Subject List flow (Power Automate) |
 | Enrolment Tracker | `Enrolment_Number` | Calculation sheet formulas (external workbook link for enrolment count) |
 | Teaching Matrix | `Teaching_Data` | Teaching Stream flow (Power Automate) |
@@ -281,7 +288,7 @@ The Office Scripts match column headers using **keyword-contains** (case-insensi
 ### Dashboard Sheet
 
 | Cell | Purpose | Used By |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | `C2` | **Year** (e.g., 2026) — used in all workflows and handbook URLs | All modules |
 | `C3` | Enrolment Tracker filename (optional override) | `SubjectListRefresh.bas` |
 | `C5` | Teaching Matrix filename (optional override) | `TeachingStreamRefresh.bas` |
@@ -301,7 +308,7 @@ The Office Scripts match column headers using **keyword-contains** (case-insensi
 ### Calculation Sheet Columns (FHY/SHY)
 
 | Col | Letter | Header |
-|-----|--------|--------|
+| --- | ------ | ------ |
 | 1 | A | UID (hidden) |
 | 2 | B | Subject Code |
 | 3 | C | Study Period |
@@ -342,7 +349,7 @@ The `SilentMode` global variable controls whether `MsgBox` calls are displayed:
 ### Modules with SilentMode guards
 
 | Module | MsgBox Count Guarded |
-|--------|---------------------|
+| ------ | -------------------- |
 | `AssessmentData.bas` | 1 |
 | `HTMLQuery.bas` | 5 (includes Mac warning + post-refresh status) |
 | `CalculationSheets.bas` | 11 |
