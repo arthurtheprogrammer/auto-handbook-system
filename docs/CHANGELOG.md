@@ -11,6 +11,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 > Everything below was developed prior to the first official release.
 
 ### Added
+
 - Full end-to-end automated pipeline: subject list extraction, teaching stream extraction, assessment web scraping, output generation
 - Power Automate flows with Office Script parsers for SharePoint data extraction
 - Power Query for handbook assessment HTML scraping

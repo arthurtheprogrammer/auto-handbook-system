@@ -17,7 +17,7 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-01: Full Pipeline — Happy Path
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Open source workbook, enter valid year in C2 | Year accepted |
 | 2 | Click Run button | All status cells (F2–F6) progress to "Complete" |
 | 3 | Wait for completion (~5–10 min) | Exported `.xlsm` appears in SharePoint folder |
@@ -29,7 +29,7 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-02: Lecturer Refresh (Exported File)
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Open exported calculation file | File opens with macros enabled |
 | 2 | Add manual notes in column S and stream enrolments in column P | Data entered |
 | 3 | Click Refresh button in L2 | Columns L–O update with latest Teaching Matrix data |
@@ -39,7 +39,7 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-03: Mac Compatibility
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Open source workbook on Mac | File opens normally |
 | 2 | Click Run button | Process starts; F3 shows "Skipped" (Power Query not available on Mac) |
 | 3 | Wait for completion | Exported file generated using existing assessment data |
@@ -48,7 +48,7 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-04: Invalid Year
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Enter non-numeric value in C2 (e.g., "abc") | Error message: "Please enter a valid year" |
 | 2 | Leave C2 blank | Error message displayed |
 | 3 | Enter year below 2025 | Error message displayed |
@@ -56,14 +56,14 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-05: Missing Source Files
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Enter incorrect filename in C3 | Power Automate flow fails; status shows error |
 | 2 | Enter incorrect filename in C5 | Power Automate flow fails; status shows error |
 
 ### TC-06: Assessment Parsing Edge Cases
 
 | Subject Type | What to Check |
-|-------------|---------------|
+| ------------ | ------------- |
 | Subject with no assessments on handbook | `assessment data parsed` shows empty row or "Failed" status |
 | Subject with group assessment | Group size correctly parsed; assessment quantity = enrolment ÷ group size |
 | Subject with exam | Exam column shows `Y`; marking hours use exam benchmark |
@@ -73,7 +73,7 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 ### TC-07: Year Rollover
 
 | Step | Action | Expected Result |
-|------|--------|----------------|
+| ---- | ------ | --------------- |
 | 1 | Update C2 to new academic year | Year accepted |
 | 2 | Ensure new year's Enrolment Tracker and Teaching Matrix exist on SharePoint | Files accessible |
 | 3 | Run full pipeline | Output reflects new year's subjects and handbook data |

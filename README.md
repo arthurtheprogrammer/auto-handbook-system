@@ -86,7 +86,7 @@ The system pulls subject enrolment data and teaching assignments from SharePoint
 ## Tech Stack
 
 | Layer | Technology |
-|-------|----------:|
+| ----- | ---------- |
 | Data Sources | SharePoint Online (Excel files) |
 | Cloud Automation | Power Automate (HTTP-triggered flows) |
 | Data Parsing | Office Scripts (TypeScript, runs in Excel Online) |
@@ -111,7 +111,7 @@ The system pulls subject enrolment data and teaching assignments from SharePoint
 
 ## Repository Structure
 
-```
+```text
 auto-handbook-system/
 ├── README.md                              ← You are here
 ├── LICENSE
@@ -149,7 +149,7 @@ auto-handbook-system/
 ## Documentation Guide
 
 | Document | Target Audience | What You'll Find |
-|----------|----------|-----------------|
+| -------- | --------------- | ---------------- |
 | 📋 [Design Doc](docs/DESIGN_DOC.md) | Stakeholders, hiring managers | Problem statement, design decisions, tradeoffs, measurable impact |
 | 👤 [User Guide](docs/USER_GUIDE.md) | Team members (non-technical) | Step-by-step instructions, data sources, troubleshooting |
 | 🔧 [Developer Guide](docs/DEVELOPER_GUIDE.md) | Maintainers, developers | Architecture, module reference, cell references, cross-platform notes |
