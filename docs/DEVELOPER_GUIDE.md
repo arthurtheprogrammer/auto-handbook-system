@@ -36,7 +36,7 @@ flowchart TD
         PQ["AllSubjectsHTML<br/>(Power Query)"]
     end
 
-    subgraph L3["Layer 3: VBA Data Processing"]
+    subgraph L3["Layer 3: VBA Processing"]
         HQ["HTMLQuery.bas<br/>(refresh query)"]
         AD["AssessmentData.bas<br/>(parse HTML)"]
     end
