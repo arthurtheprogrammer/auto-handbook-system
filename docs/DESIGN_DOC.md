@@ -169,13 +169,13 @@ The chosen approach meets users where they already are — inside Excel — with
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
-| **Phase 1** | Subject list extraction — Power Automate flow + Office Script to parse Enrolment Tracker into `subject_list` table | ✅ Complete |
-| **Phase 2** | Teaching stream extraction — Power Automate flow + Office Script to parse Teaching Matrix into `teaching_stream` table | ✅ Complete |
-| **Phase 3** | Assessment web scraping — Power Query to fetch handbook HTML; VBA to parse into structured assessment records | ✅ Complete |
-| **Phase 4** | Output generation — VBA to generate FHY/SHY calculation sheets with formulas, protection, and formatting | ✅ Complete |
-| **Phase 5** | Export & refresh — Export standalone `.xlsm` with embedded `LecturerRefresh.bas` for mid-semester updates | ✅ Complete |
-| **Phase 6** | Cross-platform support — Mac compatibility for all VBA modules (conditional compilation, AppleScript HTTP) | ✅ Complete |
-| **Phase 7** | Documentation — User Guide, Developer Guide, and this Design Document | ✅ Complete |
+| **Phase 1** | Subject list extraction — Power Automate flow + Office Script to parse Enrolment Tracker into `subject_list` table | ✓ |
+| **Phase 2** | Teaching stream extraction — Power Automate flow + Office Script to parse Teaching Matrix into `teaching_stream` table | ✓ |
+| **Phase 3** | Assessment web scraping — Power Query to fetch handbook HTML; VBA to parse into structured assessment records | ✓ |
+| **Phase 4** | Output generation — VBA to generate FHY/SHY calculation sheets with formulas, protection, and formatting | ✓ |
+| **Phase 5** | Export & refresh — Export standalone `.xlsm` with embedded `LecturerRefresh.bas` for mid-semester updates | ✓ |
+| **Phase 6** | Cross-platform support — Mac compatibility for all VBA modules (conditional compilation, AppleScript HTTP) | ✓ |
+| **Phase 7** | Documentation — User Guide, Developer Guide, and this Design Document | ✓ |
 
 ---
 
