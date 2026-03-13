@@ -144,6 +144,7 @@ Sub GenerateSubjectQueries()
             Dim jsonPayload As String
             jsonPayload = "{" & Chr(34) & "year" & Chr(34) & ":" & yearValue & "," & _
                            Chr(34) & "email" & Chr(34) & ":" & Chr(34) & EscapeJSON(emailValue) & Chr(34) & "," & _
+                           Chr(34) & "tab" & Chr(34) & ":" & Chr(34) & "assessment" & Chr(34) & "," & _
                            Chr(34) & "subjects" & Chr(34) & ":" & subjectCodes & "}"
             
             If Not dashboardSheet Is Nothing Then

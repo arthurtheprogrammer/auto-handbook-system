@@ -104,17 +104,17 @@ The `teachingStreamParser` Office Script updates the `progress_bar` table in the
 
 ---
 
-## Flow 3: Assessment Query Workflow
+## Flow 3: Handbook Query Workflow
 
-**File**: [assessment query.json](assessment%20query.json)
+**File**: [handbook query (assessment).json](handbook%20query%20(assessment).json)
 
 **Visual Diagram**:
 
-![Assessment Query Workflow diagram](assessment%20query%20workflow.png)
+![Handbook Query Workflow diagram](handbook%20query%20workflow.png)
 
 **Trigger**: HTTP POST from `HTMLQuery.bas` (Mac only)
 
-**Purpose**: Fetches assessment HTML tables from the University Handbook website. This acts as a cloud-fallback for Mac users because Power Query is a Windows-only feature in Excel.
+**Purpose**: Fetches HTML tables from specific tabs (like assessment) on the University Handbook website. This acts as a cloud-fallback for Mac users because Power Query is a Windows-only feature in Excel.
 
 ### Input Parameters
 
@@ -122,13 +122,14 @@ The `teachingStreamParser` Office Script updates the `progress_bar` table in the
 | --------- | ---- | ----------- |
 | `year` | integer | Academic year (e.g., `2026`) |
 | `subjects` | array | Array of subject codes (e.g., `["MGMT10001", "MKTG10001"]`) |
+| `tab` | string | Tab to fetch (e.g., `assessment`) |
 
 ### Execution Steps
 
 ```text
 1. Parse HTTP Request                → Extract `year` and `subjects` array
 2. Loop over subjects                ─┐  (parallel)
-3. Fetch Handbook URL                → Send GET request to `https://handbook.unimelb.edu.au/{year}/subjects/{code}/assessment`
+3. Fetch Handbook URL                → Send GET request to `https://handbook.unimelb.edu.au/{year}/subjects/{code}/{tab}`
 4. Parse HTML Content                → Extract the `<div class="assessment-table">` block from the HTML body
 5. Write HTML Table                  → Run `Excel Online (Run script)` action to append rows to `AllSubjectsHTML` sheet
 6. Finalise Process                  → Update `F3` status cell when all subjects are complete

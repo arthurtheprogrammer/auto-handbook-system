@@ -64,7 +64,7 @@ When `GenerateMarkingSupport()` is called:
 | 2 | `SubjectListRefresh.bas` | HTTP POST to Power Automate → triggers `subjectListParser.osts` → populates `SubjectList` table |
 | 3 | `TeachingStreamRefresh.bas` | HTTP POST to Power Automate → triggers `teachingStreamParser.osts` → populates `teaching_stream` table |
 | 4 | `Integration.bas` | Monitors Dashboard F2 and F5 cells for "Done" (polling loop, 5s interval, 30min timeout) |
-| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment format). **On Mac**: skips PQ, optionally triggers **Assessment Query Workflow** and monitors cell F3 |
+| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment format). **On Mac**: skips PQ, optionally triggers **Handbook Query Workflow** and monitors cell F3 |
 | 6 | `AssessmentData.bas` | Parses HTML from `AllSubjectsHTML` → writes structured data to `assessment data parsed` sheet |
 | 7 | `CalculationSheets.bas` | Generates `FHY Calculations` and `SHY Calculations` sheets, exports to new `.xlsm` with `LecturerRefresh.bas` embedded |
 | 8 | `Integration.bas` | Sends email notification, sets `SilentMode = False` |
