@@ -32,18 +32,22 @@ Backups from previous successful runs (2026) are stored on the department **Shar
 | ---- | ------ | --------------- |
 | 1 | Open exported calculation file | File opens with macros enabled |
 | 2 | Add manual notes in column S and stream enrolments in column P | Data entered |
-| 3 | Click Refresh button in L2 | Columns L–O update with latest Teaching Matrix data |
-| 4 | Verify columns P and S | Manual entries preserved after refresh |
-| 5 | Verify new lecturer appears | If Teaching Matrix was updated, new lecturer shows in column L |
+| 3 | Click Refresh button in L2 | Source Dashboard F5 turns **orange** ("Running...") |
+| 4 | Wait for workflow to complete | F5 turns **green** ("Updated") when teaching stream data is refreshed |
+| 5 | Verify columns L–O updated | Columns L–O update with latest Teaching Matrix data |
+| 6 | Verify columns P and S | Manual entries preserved after refresh |
+| 7 | Verify new lecturer appears | If Teaching Matrix was updated, new lecturer shows in column L |
 
 ### TC-03: Mac Compatibility
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
 | 1 | Open source workbook on Mac | File opens normally |
-| 2 | Click Run button | Process starts; F3 shows "Skipped" (Power Query not available on Mac) |
-| 3 | Wait for completion | Exported file generated using existing assessment data |
-| 4 | Verify exported file | FHY/SHY sheets present; assessment data from previous Windows run |
+| 2 | Click Run button | Prompt offers cloud HTML download workflow or skip |
+| 3a | Choose "Yes" (cloud workflow) | F3 shows "Running...", then "Complete" when workflow finishes (up to 10 min) |
+| 3b | Choose "No" (skip) | F3 shows "Skipped" (grey); existing assessment data used |
+| 4 | Wait for completion | Exported file generated |
+| 5 | Verify exported file | FHY/SHY sheets present; assessment data is current (3a) or from previous run (3b) |
 
 ### TC-04: Invalid Year
 
