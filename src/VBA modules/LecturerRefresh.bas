@@ -157,8 +157,8 @@ CleanExit:
     If updateCount > 0 Then
         MsgBox "Lecturer data refreshed successfully!" & vbCrLf & vbCrLf & _
                "Updated " & updateCount & " subject(s)." & vbCrLf & vbCrLf & _
-               "¥ Lecturer names, status, activity codes refreshed (columns L-O)" & vbCrLf & _
-               "¥ Your notes and enrolments preserved (columns P, S)", vbInformation, "Refresh Complete"
+               "- Lecturer names, status, activity codes refreshed (columns L-O)" & vbCrLf & _
+               "- Your notes and enrolments preserved (columns P, S)", vbInformation, "Refresh Complete"
     End If
     Exit Sub
     
