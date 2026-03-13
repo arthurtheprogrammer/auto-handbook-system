@@ -87,6 +87,10 @@ Public Sub RefreshLecturerData()
         GoTo CleanExit
     End If
     
+    ' STEP 1.5: Clear stale status in source file
+    Application.StatusBar = "Clearing prior workflow status..."
+    ClearSourceWorkflowStatus
+    
     ' STEP 2: Trigger Teaching Matrix workflow
     Application.StatusBar = "Triggering Teaching Matrix workflow..."
     
@@ -275,6 +279,7 @@ Private Function WaitForTeachingMatrixWorkflowCompletion(maxWaitSeconds As Long)
         
         If statusUpper = "DONE" Or statusUpper = "COMPLETE" Or statusUpper = "FINISHED" Or statusUpper = "SUCCESS" Then
             Application.StatusBar = "Teaching Matrix workflow completed successfully!"
+            UpdateSourceWorkflowComplete
             WaitForTeachingMatrixWorkflowCompletion = True
             Exit Function
         End If
@@ -331,6 +336,67 @@ Private Function GetTeachingMatrixWorkflowStatus() As String
     
     On Error GoTo 0
 End Function
+
+'---------------------------------------------------------------
+' ClearSourceWorkflowStatus
+' Purpose: Open source workbook read/write and reset F5 to
+'          "Running..." (orange) to prevent stale status from
+'          a prior run causing false early completion
+' Called by: RefreshLecturerData (before triggering workflow)
+'---------------------------------------------------------------
+Private Sub ClearSourceWorkflowStatus()
+    On Error Resume Next
+    
+    Dim sourceWb As Workbook
+    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+    
+    If Not sourceWb Is Nothing Then
+        Dim sourceSheet As Worksheet
+        Set sourceSheet = sourceWb.Sheets("Dashboard")
+        
+        If Not sourceSheet Is Nothing Then
+            With sourceSheet.Range("F5")
+                .Value = "Running..."
+                .Interior.Color = RGB(255, 192, 0)  ' Orange
+            End With
+        End If
+        
+        sourceWb.Save
+        sourceWb.Close SaveChanges:=False
+    End If
+    
+    On Error GoTo 0
+End Sub
+
+'---------------------------------------------------------------
+' UpdateSourceWorkflowComplete
+' Purpose: Open source workbook and set F5 to "Updated" (green)
+'          to indicate the lecturer refresh detected completion
+' Called by: WaitForTeachingMatrixWorkflowCompletion
+'---------------------------------------------------------------
+Private Sub UpdateSourceWorkflowComplete()
+    On Error Resume Next
+    
+    Dim sourceWb As Workbook
+    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+    
+    If Not sourceWb Is Nothing Then
+        Dim sourceSheet As Worksheet
+        Set sourceSheet = sourceWb.Sheets("Dashboard")
+        
+        If Not sourceSheet Is Nothing Then
+            With sourceSheet.Range("F5")
+                .Value = "Updated"
+                .Interior.Color = RGB(146, 208, 80)  ' Green
+            End With
+        End If
+        
+        sourceWb.Save
+        sourceWb.Close SaveChanges:=False
+    End If
+    
+    On Error GoTo 0
+End Sub
 
 '===============================================================
 ' SECTION 3: HTTP REQUESTS
