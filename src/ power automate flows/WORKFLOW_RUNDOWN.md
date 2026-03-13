@@ -63,7 +63,7 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 
 **Purpose**: Reads the Teaching Matrix (two tables: Teaching Data and Staff), filters and transforms the data, then runs the `teachingStreamParser` Office Script to populate the `teaching_stream` table.
 
-### Flow 2 Input Parameters
+### Input Parameters
 
 | Parameter | Type | Description |
 | --------- | ---- | ----------- |
@@ -71,7 +71,7 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 | `teachingMatrixFilename` | string | Override filename (blank = default `YEAR_M&M_Teaching Matrix.xlsm`) |
 | `email` | string | Notification email (optional) |
 
-### Flow 2 Execution Steps
+### Execution Steps
 
 ```text
 1. Initialise File Path                    → Initialise `filePath` variable (null)
@@ -88,7 +88,7 @@ The `subjectListParser` Office Script updates the `progress_bar` table in the so
 10. Generate Teaching Stream table          → Run `teachingStreamParser` Office Script with both datasets
 ```
 
-### Flow 2 Connectors Used
+### Connectors Used
 
 | Connector | Connection | Usage |
 | --------- | ---------- | ----- |

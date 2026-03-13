@@ -194,7 +194,7 @@ The `AllSubjectsHTML` Power Query:
 
 | Function | Purpose |
 | -------- | ------- |
-| `GenerateSubjectQueries()` | Mac detection → Power Query refresh (targeted connection) → format → post-refresh status check |
+| `GenerateSubjectQueries()` | Mac detection → Power Automate workflow trigger (Mac) or Power Query refresh (Windows) → format → post-refresh status check |
 | `FormatTableCleanup()` | Standardizes row heights, column widths, hyperlinks, table style |
 
 ### AssessmentData.bas
@@ -222,10 +222,10 @@ The `AllSubjectsHTML` Power Query:
 
 | Function | Purpose |
 | -------- | ------- |
-| `RefreshLecturerData()` | Main entry: reads source params → triggers Workflow 3 → waits → updates lecturer columns |
+| `RefreshLecturerData()` | Main entry: reads source params → triggers Teaching Matrix workflow → waits → updates lecturer columns |
 | `GetSourceParameters()` | Opens source workbook read-only, reads C2/C5/C12 |
-| `TriggerWorkflow3()` | HTTP POST to Power Automate (Teaching Stream endpoint) |
-| `WaitForWorkflow3Completion()` | Polls source Dashboard F5 every 3s (2min timeout) |
+| `TriggerTeachingMatrixWorkflow()` | HTTP POST to Power Automate (Teaching Stream endpoint) |
+| `WaitForTeachingMatrixWorkflowCompletion()` | Polls source Dashboard F5 every 3s (2min timeout) |
 | `IdentifySubjectBlocks()` | Scans FHY/SHY Calculations for subject blocks by UID pattern |
 | `UpdateAllLecturers()` | Refreshes columns L–O, preserves P–S user edits, inserts rows if needed |
 
@@ -360,11 +360,11 @@ The `SilentMode` global variable controls whether `MsgBox` calls are displayed:
 
 The system supports both **Mac** and **Windows**:
 
-- **Power Query** (AllSubjectsHTML refresh) is **Windows-only**. On Mac, the refresh is skipped with a user-facing warning — the process continues using existing data. This is acceptable after the first run each academic year since handbook content rarely changes after semester starts.
+- **Power Query** (AllSubjectsHTML refresh) is **Windows-only**. On Mac, the system triggers a **Power Automate HTML download workflow** as a cloud-side fallback (polls Dashboard F3 for completion, 5-minute timeout). The user can opt to skip and use existing data instead.
 - HTTP requests use `#If Mac Then` conditional compilation
   - Mac: `MacScript("do shell script ""curl ...""")` via AppleScript
   - Windows: `MSXML2.XMLHTTP` / `MSXML2.ServerXMLHTTP` COM objects
-- `Integration.bas` sets F3 status to **"Skipped"** (grey) on Mac instead of "Complete" (green)
+- `Integration.bas` monitors F3 status during integrated runs. On Mac, F3 shows **"Running..."** during the cloud workflow, **"Complete"** when done, **"Timeout"** if the 5-minute poll expires, or **"Skipped"** (grey) if the user opts out
 - Path separators handled via `Application.PathSeparator`
 - `LecturerRefresh.bas` uses Mac-compatible 2D arrays instead of Collections for return types
 
@@ -404,7 +404,7 @@ The system supports both **Mac** and **Windows**:
 
 1. The source workbook path is hardcoded in `LecturerRefresh.bas` (line 23) — if the SharePoint folder moves, update it
 2. The source workbook must be accessible (not locked by another user)
-3. Workflow 3 timeout is 2 minutes — if the Teaching Matrix is very large, increase `maxWaitSeconds` in `WaitForWorkflow3Completion`
+3. Teaching Matrix workflow timeout is 2 minutes — if the Teaching Matrix is very large, increase `maxWaitSeconds` in `WaitForTeachingMatrixWorkflowCompletion`
 
 ### MsgBox dialogs appear during integrated run
 

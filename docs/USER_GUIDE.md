@@ -78,7 +78,7 @@ Make sure these files exist on SharePoint:
 6. **Done!** The exported file appears in the same SharePoint folder as the source workbook
 
 > [!NOTE]
-> **Running on a Mac?** The Subject Queries step (F3) fetches handbook data from the university website and only runs on Windows. On Mac it will be **skipped** — the system will show a message and continue using existing data. This is fine after the first proper run each academic year, as handbook content rarely changes once semester starts.
+> **Running on a Mac?** The Subject Queries step (F3) uses Power Query on Windows but is not available natively on Mac. Instead, on Mac you will be prompted to trigger a **cloud-based HTML download** via Power Automate. This takes a few minutes longer but produces the same result. You can also choose to skip and use existing data (check if the existing data is not from previous year).
 
 <!-- -->
 
@@ -201,7 +201,7 @@ These tables are populated automatically to build towards the final output sprea
 | F | Activity ID | Teaching activity codes | `S01_01; S02_01` |
 | G | Streams | Number of teaching streams | `2` |
 
-#### `AllSubjectsHTML` Sheet (Power Query)
+#### `AllSubjectsHTML` Sheet (Power Query / Power Automate)
 
 | Column | Header | What It Contains |
 | ------ | ------ | ---------------- |
@@ -497,6 +497,14 @@ Or via preferences:
 
 1. Check that the year in C2 matches an existing handbook year
 2. Try opening one of the handbook URLs manually in your browser to verify
+
+---
+
+### "VBA Access Required" error or Export/Refresh fails
+
+**Cause:** Excel doesn't have permission to modify its own VBA code, which is needed to attach the lecturer refresh script to the exported calculation file.
+
+**Fix:** Follow the [First-Time Setup](#first-time-setup-excel-trust--calculation-settings) instructions to enable "Trust access to the VBA project object model" in your Excel Settings/Preferences.
 
 ---
 

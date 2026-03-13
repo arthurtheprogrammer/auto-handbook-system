@@ -1,7 +1,7 @@
 '===============================================================
 ' Module: LecturerRefresh
 ' Purpose: Refresh lecturer data in exported calculation sheets
-'          by triggering Workflow 3 (Teaching Matrix Processing),
+'          by triggering the Teaching Matrix workflow,
 '          then updating columns L-O with fresh data while
 '          preserving user edits in columns P and S
 ' Main Entry: RefreshLecturerData() - triggered by Refresh button
@@ -12,7 +12,7 @@
 ' Dependencies:
 '   - Source file: Automated Handbook Data System.xlsm (SharePoint)
 '   - teaching stream sheet in source file
-'   - Workflow 3 Power Automate endpoint
+'   - Teaching Matrix Power Automate endpoint
 '===============================================================
 
 Option Explicit
@@ -26,8 +26,8 @@ Private Const SOURCE_FILE_PATH As String = "https://unimelbcloud.sharepoint.com/
 ' Source sheets
 Private Const TEACHING_STREAM_SHEET As String = "teaching stream"
 
-' Workflow 3 Power Automate endpoint
-Private Const WORKFLOW3_URL As String = "https://default0e5bf3cf1ff446b7917652c538c22a.4d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7f198e614c734715bc0153d818de1ef7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=5uUuhFHyiL37O_ajy-6t2r65nFqc7NA_oJDhYmYFT9g"
+' Teaching Matrix Power Automate endpoint
+Private Const TEACHING_MATRIX_URL As String = "https://default0e5bf3cf1ff446b7917652c538c22a.4d.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/7f198e614c734715bc0153d818de1ef7/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=5uUuhFHyiL37O_ajy-6t2r65nFqc7NA_oJDhYmYFT9g"
 
 ' SubjectBlockInfo array indices (0-6)
 ' Used to reference fields in the block info arrays returned by
@@ -90,7 +90,7 @@ Public Sub RefreshLecturerData()
     ' STEP 2: Trigger Teaching Matrix workflow
     Application.StatusBar = "Triggering Teaching Matrix workflow..."
     
-    If Not TriggerWorkflow3(yearValue, teachingMatrix, emailValue) Then
+    If Not TriggerTeachingMatrixWorkflow(yearValue, teachingMatrix, emailValue) Then
         MsgBox "Failed to trigger Teaching Matrix workflow." & vbCrLf & vbCrLf & _
                "Check your network connection and try again.", vbExclamation, "Workflow Error"
         GoTo CleanExit
@@ -103,7 +103,7 @@ Public Sub RefreshLecturerData()
     ' STEP 3: Wait for Teaching Matrix workflow completion
     Application.StatusBar = "Waiting for Teaching Matrix workflow to complete..."
     
-    If Not WaitForWorkflow3Completion(120) Then  ' 2 minute timeout
+    If Not WaitForTeachingMatrixWorkflowCompletion(120) Then  ' 2 minute timeout
         Dim response As VbMsgBoxResult
         response = MsgBox("Teaching Matrix workflow did not complete within 2 minutes." & vbCrLf & vbCrLf & _
                          "The workflow may still be running in the background." & vbCrLf & vbCrLf & _
@@ -224,9 +224,9 @@ Private Function TriggerTeachingMatrixWorkflow(yearValue As String, teachingMatr
     Dim result As String
     
     #If Mac Then
-        result = SendRequestMac(WORKFLOW3_URL, jsonData)
+        result = SendRequestMac(TEACHING_MATRIX_URL, jsonData)
     #Else
-        result = SendRequestWindows(WORKFLOW3_URL, jsonData)
+        result = SendRequestWindows(TEACHING_MATRIX_URL, jsonData)
     #End If
     
     TriggerTeachingMatrixWorkflow = (result <> "ERROR")
@@ -260,7 +260,7 @@ Private Function WaitForTeachingMatrixWorkflowCompletion(maxWaitSeconds As Long)
         
         ' Check workflow status
         Dim currentStatus As String
-        currentStatus = GetWorkflow3Status()
+        currentStatus = GetTeachingMatrixWorkflowStatus()
         
         ' Update status every 5 checks (~15 seconds)
         If checkCount Mod 5 = 0 Then
@@ -274,8 +274,8 @@ Private Function WaitForTeachingMatrixWorkflowCompletion(maxWaitSeconds As Long)
         statusUpper = UCase(Trim(currentStatus))
         
         If statusUpper = "DONE" Or statusUpper = "COMPLETE" Or statusUpper = "FINISHED" Or statusUpper = "SUCCESS" Then
-            Application.StatusBar = "Workflow 3 completed successfully!"
-            WaitForWorkflow3Completion = True
+            Application.StatusBar = "Teaching Matrix workflow completed successfully!"
+            WaitForTeachingMatrixWorkflowCompletion = True
             Exit Function
         End If
         
@@ -452,10 +452,10 @@ Private Sub IdentifySubjectBlocks(wb As Workbook, subjectBlocks As Collection)
                         blockInfo(SBI_STUDYPERIOD) = parts(1)
                         
                         ' Find Total row
-                        blockInfo(SBI_TOTALROW) = FindTotalRow(ws, i)
+                        blockInfo(SBI_TOTALROW) = FindTotalRow(calcSheet, i)
                         
                         ' Find last subject row
-                        blockInfo(SBI_LASTSUBJECTROW) = FindLastSubjectRow(ws, i)
+                        blockInfo(SBI_LASTSUBJECTROW) = FindLastSubjectRow(calcSheet, i)
                         
                         ' Calculate number of assessment rows
                         blockInfo(SBI_NUMASSESSMENTROWS) = blockInfo(SBI_TOTALROW) - blockInfo(SBI_HEADERROW) - 1
@@ -626,10 +626,10 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
             ' =========================================================================
             Dim Row As Long
             For Row = firstLecturerRow To totalRow - 1
-                ws.Cells(Row, 12).ClearContents  ' Column L: Lecturer Name
-                ws.Cells(Row, 13).ClearContents  ' Column M: Status
-                ws.Cells(Row, 14).ClearContents  ' Column N: Stream Number
-                ws.Cells(Row, 15).ClearContents  ' Column O: Activity Code
+                calcSheet.Cells(Row, 12).ClearContents  ' Column L: Lecturer Name
+                calcSheet.Cells(Row, 13).ClearContents  ' Column M: Status
+                calcSheet.Cells(Row, 14).ClearContents  ' Column N: Stream Number
+                calcSheet.Cells(Row, 15).ClearContents  ' Column O: Activity Code
                 ' Columns P-S are NOT touched (preserve user edits)
             Next Row
             
@@ -701,7 +701,7 @@ Private Sub ApplyLecturerFormulas(calcSheet As Worksheet, headerRow As Long, tot
         formulas(i, 1) = "=IF(M" & outputRow & "=""Continuing T&R"",N" & outputRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
         
         ' Column R (18): Marking Support Hours Available
-        formulas(i, 2) = "=IF(Q" & outputRow & "="""","""",$J$" & totalRow & "*(P" & outputRow & "/D" & headerRow & ")-Q" & outputRow & ")"
+        formulas(i, 2) = "=IF(OR(P" & outputRow & "="""",Q" & outputRow & "=""""),"""",$J$" & totalRow & "*(P" & outputRow & "/D" & headerRow & ")-Q" & outputRow & ")"
         
         i = i + 1
     Next outputRow

@@ -230,7 +230,20 @@ End Function
 '---------------------------------------------------------------
 Sub GenerateCalculationSheets()
     Dim wb As Workbook
+    Dim dashboardSheet As Worksheet
     Set wb = ThisWorkbook
+    
+    On Error Resume Next
+    Set dashboardSheet = wb.Sheets("Dashboard")
+    On Error GoTo 0
+    
+    If Not dashboardSheet Is Nothing Then
+        With dashboardSheet.Range("F6")
+            .Value = "Running..."
+            .Interior.Color = RGB(255, 192, 0)
+        End With
+        DoEvents
+    End If
     
     Dim tStart As Double, tPhase As Double
     tStart = Timer
@@ -356,10 +369,24 @@ CleanExit:
     Application.StatusBar = False
     
     If HasErrorsInLog() Then
+        If Not dashboardSheet Is Nothing Then
+            With dashboardSheet.Range("F6")
+                .Value = "Failed"
+                .Interior.Color = RGB(255, 0, 0)
+            End With
+            DoEvents
+        End If
         If Not SilentMode Then MsgBox "Errors were detected during generation." & vbCrLf & vbCrLf & _
                "Please check the 'Process Log' sheet for details." & vbCrLf & _
                "Files were NOT exported.", vbExclamation, "Generation Completed with Errors"
     Else
+        If Not dashboardSheet Is Nothing Then
+            With dashboardSheet.Range("F6")
+                .Value = "Done"
+                .Interior.Color = RGB(146, 208, 80)
+            End With
+            DoEvents
+        End If
         If Not SilentMode Then MsgBox "Calculation sheets generated and exported successfully!" & vbCrLf & vbCrLf & _
                "Total time: " & Format(Timer - tStart, "0.0") & " seconds" & vbCrLf & _
                "Check the 'Process Log' sheet for details.", vbInformation
@@ -372,6 +399,14 @@ ErrorHandler:
     Application.ScreenUpdating = origScreenUpdating
     Application.EnableEvents = origEnableEvents
     Application.StatusBar = False
+    
+    If Not dashboardSheet Is Nothing Then
+        With dashboardSheet.Range("F6")
+            .Value = "Failed"
+            .Interior.Color = RGB(255, 0, 0)
+        End With
+        DoEvents
+    End If
     
     Dim errMsg As String
     errMsg = "Error in GenerateCalculationSheets: " & Err.description & " (Error " & Err.Number & ")"
@@ -473,7 +508,11 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
         Exit Function
     End If
     
-    newWB.Application.Calculation = xlCalculationAutomatic
+    ' Force recalculate exported sheets
+    Dim ws As Worksheet
+    For Each ws In newWB.Worksheets
+        ws.Calculate
+    Next ws
     
     ' ========================================================================
     ' STEP 4: Copy VBA module FIRST (creates VBA project)
@@ -996,13 +1035,16 @@ Function PopulateSheetData(wb As Workbook, wsOutput As Worksheet, subjectData As
     ' Collection to store marker formula info for batch processing
     Dim markerFormulaQueue As New Collection
     
+    ' Collection to store dropdown cell locations for batch processing
+    Dim dropdownQueue As New Collection
+    
    ' Process subjects by category
 If groupedPeriod = "FHY" Then
-    Call ProcessSubjectCollection(wb, wsOutput, summerSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "", "SUMMER")
-    Call ProcessSubjectCollection(wb, wsOutput, semester1Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "SEMESTER 1", "SEMESTER 1")
+    Call ProcessSubjectCollection(wb, wsOutput, summerSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, dropdownQueue, "", "SUMMER")
+    Call ProcessSubjectCollection(wb, wsOutput, semester1Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, dropdownQueue, "SEMESTER 1", "SEMESTER 1")
 Else
-    Call ProcessSubjectCollection(wb, wsOutput, winterSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "", "WINTER")
-    Call ProcessSubjectCollection(wb, wsOutput, semester2Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, "SEMESTER 2", "SEMESTER 2")
+    Call ProcessSubjectCollection(wb, wsOutput, winterSubjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, dropdownQueue, "", "WINTER")
+    Call ProcessSubjectCollection(wb, wsOutput, semester2Subjects, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, dropdownQueue, "SEMESTER 2", "SEMESTER 2")
 End If
     
     ' NOW APPLY ALL MARKER FORMULAS IN BATCH
@@ -1011,6 +1053,13 @@ End If
     For Each formulaInfo In markerFormulaQueue
         Call SetMarkerBlockFormulas(wsOutput, CLng(formulaInfo(0)), CLng(formulaInfo(1)), CInt(formulaInfo(2)), CStr(formulaInfo(3)), CStr(formulaInfo(4)))
     Next formulaInfo
+    
+    ' NOW APPLY ALL CONTRACT DROPDOWNS IN BATCH
+    LogMessage "Applying contract dropdowns in batch..."
+    Dim dropdownInfo As Variant
+    For Each dropdownInfo In dropdownQueue
+        Call SetContractDropdown(wsOutput, CLng(dropdownInfo(0)), CInt(dropdownInfo(1)))
+    Next dropdownInfo
     
     LogMessage "PopulateSheetData completed", Timer - tStart
     PopulateSheetData = True
@@ -1029,7 +1078,7 @@ End Function
 '---------------------------------------------------------------
 Sub ProcessSubjectCollection(wb As Workbook, wsOutput As Worksheet, subjects As Collection, _
     ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, _
-    markerFormulaQueue As Collection, headerText As String, categoryName As String)
+    markerFormulaQueue As Collection, dropdownQueue As Collection, headerText As String, categoryName As String)
     
     If subjects.count = 0 Then Exit Sub
     
@@ -1045,7 +1094,7 @@ Sub ProcessSubjectCollection(wb As Workbook, wsOutput As Worksheet, subjects As 
     ' Process all subjects in collection
     Dim subject As Variant
     For Each subject In subjects
-        If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue) Then
+        If Not ProcessSubject(wb, wsOutput, subject, currentRow, wordBench, examBench, markingSupportBench, markerFormulaQueue, dropdownQueue) Then
             LogMessage "ERROR: Failed to process subject in " & categoryName
         End If
     Next subject
@@ -1059,7 +1108,7 @@ End Sub
 ' Called by: ProcessSubjectCollection
 ' Returns: True on success
 '---------------------------------------------------------------
-Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, ByRef markerFormulaQueue As Collection) As Boolean
+Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As Variant, ByRef currentRow As Long, wordBench As Double, examBench As Double, markingSupportBench As Double, ByRef markerFormulaQueue As Collection, ByRef dropdownQueue As Collection) As Boolean
     On Error GoTo ErrorHandler
     
     ProcessSubject = False
@@ -1202,10 +1251,14 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
         markerFormulaQueue.add markerInfo
     Next mk
     
-    ' Add checkboxes
-    Call SetContractDropdown(wsOutput, subjectStartRow, 1)
-    Call SetContractDropdown(wsOutput, subjectStartRow, 2)
-    Call SetContractDropdown(wsOutput, subjectStartRow, 3)
+    ' QUEUE dropdown locations for batch processing (don't execute yet)
+    Dim dk As Integer
+    For dk = 1 To 3
+        Dim dropdownItem(0 To 1) As Variant
+        dropdownItem(0) = subjectStartRow
+        dropdownItem(1) = dk
+        dropdownQueue.Add dropdownItem
+    Next dk
     
     currentRow = subjectEndRow + 1
     
@@ -1637,9 +1690,8 @@ Sub PopulateLecturerData(wsOutput As Worksheet, lecturers As Collection, startRo
         formulas(i, 1) = "=IF(M" & currentRow & "=""Continuing T&R"",N" & currentRow & "*VALUE(LEFT($Q$2,FIND("" "",$Q$2)-1)),"""")"
         
         ' Column R (18): Marking Support Hours Available formula (UPDATED)
-        ' =IF(Q12="","",$J$16*(P12/D11)-Q12)
-        ' New: =IF(R12="","",$J$totalRow*(P12/D11)-R12)
-        formulas(i, 2) = "=IF(Q" & currentRow & "="""","""",$J$" & totalRow & "*(P" & currentRow & "/D" & (startRow - 1) & ")-Q" & currentRow & ")"
+        ' =IF(OR(P="",Q=""),"",$J$totalRow*(P/D)-Q)
+        formulas(i, 2) = "=IF(OR(P" & currentRow & "="""",Q" & currentRow & "=""""),"""",$J$" & totalRow & "*(P" & currentRow & "/D" & (startRow - 1) & ")-Q" & currentRow & ")"
     Next i
     
     ' BATCH WRITE both formulas at once (columns Q and R, shifted from 16-17 to 17-18)

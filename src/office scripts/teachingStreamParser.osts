@@ -3,7 +3,7 @@
  * Purpose: Parse lecturer stream assignments and employment statuses
  *          from Power Automate, aggregate by subject/period/lecturer,
  *          and write to the teaching_stream table
- * Trigger: Power Automate Workflow 3 (Teaching Matrix Processing)
+ * Trigger: Power Automate Teaching Matrix Workflow
  * Output:  Populated teaching_stream table on "teaching stream" sheet,
  *          progress_bar status updated on Dashboard
  * Author:  Arthur Chen

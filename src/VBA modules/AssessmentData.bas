@@ -35,6 +35,7 @@ End Type
 Sub ParseAssessmentData()
     Dim wsSource As Worksheet
     Dim wsTarget As Worksheet
+    Dim dashboardSheet As Worksheet
     Dim lastRow As Long
     Dim sourceRow As Long
     Dim outputRow As Long
@@ -42,6 +43,18 @@ Sub ParseAssessmentData()
     Dim htmlContent As String
         
     Set wsSource = ThisWorkbook.Sheets("AllSubjectsHTML")
+    
+    On Error Resume Next
+    Set dashboardSheet = ThisWorkbook.Sheets("Dashboard")
+    On Error GoTo 0
+    
+    If Not dashboardSheet Is Nothing Then
+        With dashboardSheet.Range("F4")
+            .Value = "Running..."
+            .Interior.Color = RGB(255, 192, 0)
+        End With
+        DoEvents
+    End If
     
     ' Create target sheet if missing, otherwise clear stale data
     On Error Resume Next
@@ -74,6 +87,14 @@ Sub ParseAssessmentData()
     Call FormatOutput(wsTarget, outputRow)
     
     If Not SilentMode Then MsgBox "Assessment data parsing completed! " & (outputRow - 2) & " records processed."
+    
+    If Not dashboardSheet Is Nothing Then
+        With dashboardSheet.Range("F4")
+            .Value = "Done"
+            .Interior.Color = RGB(146, 208, 80)
+        End With
+        DoEvents
+    End If
 End Sub
 
 '---------------------------------------------------------------
@@ -681,5 +702,39 @@ Function ExtractGroupSize(description As String) As Integer
                 End If
             End If
         End If
+        Exit Function
+    End If
+    
+    ' FALLBACK: If description contains "group" but no "groups of" pattern,
+    ' scan for a number-dash-number range (e.g. "Group report (4-5)")
+    If InStr(1, description, "group", vbTextCompare) > 0 Then
+        Dim i As Long
+        For i = 1 To Len(description) - 2
+            ' Look for digit followed by dash
+            If IsNumeric(Mid(description, i, 1)) And Mid(description, i + 1, 1) = "-" Then
+                ' Check if there's a digit after the dash
+                Dim afterDash As Long
+                afterDash = i + 2
+                If afterDash <= Len(description) And IsNumeric(Mid(description, afterDash, 1)) Then
+                    ' Extract the number before the dash
+                    Dim numBefore As String
+                    numBefore = ""
+                    Dim j As Long
+                    ' Walk backwards to get full number before dash
+                    For j = i To 1 Step -1
+                        If IsNumeric(Mid(description, j, 1)) Then
+                            numBefore = Mid(description, j, 1) & numBefore
+                        Else
+                            Exit For
+                        End If
+                    Next j
+                    
+                    If numBefore <> "" And IsNumeric(numBefore) Then
+                        ExtractGroupSize = CInt(numBefore)
+                        Exit Function
+                    End If
+                End If
+            End If
+        Next i
     End If
 End Function

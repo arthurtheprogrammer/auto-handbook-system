@@ -22,6 +22,28 @@ Public SilentMode As Boolean
 '===============================================================
 
 '---------------------------------------------------------------
+' CheckVBAAccess
+' Purpose: Verify "Trust access to VBA project object model" is enabled
+' Returns: True if enabled, False otherwise (and shows a prompt)
+'---------------------------------------------------------------
+Public Function CheckVBAAccess(wb As Workbook, actionContext As String) As Boolean
+    Dim vbaCount As Long
+    On Error Resume Next
+    vbaCount = wb.VBProject.VBComponents.count
+    If Err.Number <> 0 Then
+        On Error GoTo 0
+        MsgBox "Excel requires access to the VBA Project to " & actionContext & "." & vbCrLf & vbCrLf & _
+               "Please enable it from the menu:" & vbCrLf & _
+               "Excel > Settings > Security > Trust access to VBA project object model" & vbCrLf & vbCrLf & _
+               "Check the User Guide for detailed instructions.", vbCritical, "VBA Access Required"
+        CheckVBAAccess = False
+    Else
+        On Error GoTo 0
+        CheckVBAAccess = True
+    End If
+End Function
+
+'---------------------------------------------------------------
 ' GenerateMarkingSupport
 ' Purpose: Main entry point — validates inputs, triggers both
 '          workflows, monitors for completion, then runs all macros
@@ -38,6 +60,11 @@ Sub GenerateMarkingSupport()
     
     ' Enable silent mode to suppress MsgBox in sub-modules
     SilentMode = True
+    
+    If Not CheckVBAAccess(ThisWorkbook, "export calculation sheets") Then
+        SilentMode = False
+        Exit Sub
+    End If
     
     ' Keep screen updating ON so status cells remain visible
     Application.ScreenUpdating = True
@@ -183,12 +210,12 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
         RunAllMacros dashboardSheet, emailValue
         FinalizeProcess dashboardSheet, emailValue
         
-        MsgBox "All processes completed!" & vbCrLf & vbCrLf & _
-               "✓ Subject List Refresh: Complete" & vbCrLf & _
-               "✓ GenerateSubjectQueries: Complete" & vbCrLf & _
-               "✓ ParseAssessmentData: Complete" & vbCrLf & _
-               "✓ Teaching Stream Refresh: Complete" & vbCrLf & _
-               "✓ GenerateCalculationSheets: Complete", vbInformation
+        MsgBox "All processes finished!" & vbCrLf & vbCrLf & _
+               "✓ Subject List Refresh" & vbCrLf & _
+               "✓ Teaching Stream Refresh" & vbCrLf & _
+               "✓ HTML Download (Subject Queries)" & vbCrLf & _
+               "✓ Assessment Data Parsing" & vbCrLf & _
+               "✓ Calculation Sheets Generation", vbInformation
         
     ElseIf StopMonitoring Then
         MsgBox "Monitoring stopped by user.", vbInformation
@@ -255,7 +282,7 @@ Function CheckWorkflowComplete(dashboardSheet As Worksheet, cellAddress As Strin
     If cellValue = "DONE" Or cellValue = "COMPLETE" Or cellValue = "FINISHED" Then
         With dashboardSheet.Range(cellAddress)
             .Interior.Color = RGB(146, 208, 80)
-            .Value = "Complete"
+            .Value = "Complete" ' Explicitly overwrite to indicate monitored success
         End With
         DoEvents
         CheckWorkflowComplete = True
@@ -274,63 +301,25 @@ End Function
 Sub RunAllMacros(dashboardSheet As Worksheet, emailValue As String)
     
     ' MACRO 1: GenerateSubjectQueries
-    With dashboardSheet.Range("F3")
-        .Value = "Running..."
-        .Interior.Color = RGB(255, 192, 0)
-    End With
-    DoEvents
-    
     On Error Resume Next
     GenerateSubjectQueries
     On Error GoTo 0
     
-    ' Power Query is Windows-only — show "Skipped" on Mac
-    #If Mac Then
-        With dashboardSheet.Range("F3")
-            .Value = "Skipped"
-            .Interior.Color = RGB(191, 191, 191)
-        End With
-    #Else
-        With dashboardSheet.Range("F3")
-            .Value = "Complete"
-            .Interior.Color = RGB(146, 208, 80)
-        End With
-    #End If
     DoEvents
     
     ' MACRO 2: ParseAssessmentData
-    With dashboardSheet.Range("F4")
-        .Value = "Running..."
-        .Interior.Color = RGB(255, 192, 0)
-    End With
-    DoEvents
-    
     On Error Resume Next
     ParseAssessmentData
     On Error GoTo 0
     
-    With dashboardSheet.Range("F4")
-        .Value = "Complete"
-        .Interior.Color = RGB(146, 208, 80)
-    End With
     DoEvents
     
     ' MACRO 3: GenerateCalculationSheets
-    With dashboardSheet.Range("F6")
-        .Value = "Running..."
-        .Interior.Color = RGB(255, 192, 0)
-    End With
-    DoEvents
-    
     On Error Resume Next
     GenerateCalculationSheets
     Application.Calculation = xlCalculationAutomatic
     On Error GoTo 0
     
-    With dashboardSheet.Range("F6")
-        .Value = "Complete"
-        .Interior.Color = RGB(146, 208, 80)
-    End With
     DoEvents
 End Sub
 
