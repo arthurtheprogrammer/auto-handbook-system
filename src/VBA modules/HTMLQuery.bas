@@ -196,8 +196,16 @@ Sub GenerateSubjectQueries()
                 If f3Status = "DONE" Or f3Status = "COMPLETE" Or f3Status = "FINISHED" Then
                     Application.StatusBar = "Formatting table..."
                     
-                    ' Silently format, leave F3 as "Done" (set by Power Automate)
+                    ' Silently format
                     Call FormatTableCleanup(htmlSheet, subjectsTable)
+                    
+                    ' Update status to Complete
+                    If Not dashboardSheet Is Nothing Then
+                        With dashboardSheet.Range("F3")
+                            .Value = "Complete"
+                            .Interior.Color = RGB(146, 208, 80)
+                        End With
+                    End If
                     
                     Application.StatusBar = False
                     Exit Sub
@@ -347,7 +355,7 @@ Sub GenerateSubjectQueries()
     
     If Not dashboardSheet Is Nothing Then
         With dashboardSheet.Range("F3")
-            .Value = "Done"
+            .Value = "Complete"
             .Interior.Color = RGB(146, 208, 80)
         End With
         DoEvents

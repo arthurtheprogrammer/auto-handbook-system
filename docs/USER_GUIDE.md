@@ -25,8 +25,8 @@ Think of this system as a **data assembly line**:
 
 ```text
 📂 Enrolment Tracker  ─┐
-                        ├──→  🤖 System processes  ──→  📊 Calculation Spreadsheet
-📂 Teaching Matrix    ─┘      everything for you         (ready to use)
+                       ├──→  🤖 System processes  ──→  📊 Calculation Spreadsheet
+📂 Teaching Matrix    ─┤      everything for you         (ready to use)
 🌐 Handbook Website   ─┘
 ```
 
@@ -212,6 +212,9 @@ These tables are populated automatically to build towards the final output sprea
 | E | Status | `Success` or `Failed` |
 | F | ErrorMessage | Error details (if failed) |
 | G | FetchTime | When the data was fetched |
+
+> [!NOTE]
+> **Windows users** fetch this data directly using Power Query. **Mac users** fetch this using the **Assessment Query Workflow** in Power Automate which acts as a fallback to download the HTML.
 
 ### Assessment Data → `assessment data parsed` Sheet
 

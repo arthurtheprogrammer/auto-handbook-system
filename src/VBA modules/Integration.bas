@@ -140,7 +140,7 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
     maxWaitMinutes = 30
     startTime = Timer
     lastRefreshTime = Timer
-    refreshInterval = 5
+    refreshInterval = 15
     subjectListComplete = False
     teachingStreamComplete = False
     
@@ -150,7 +150,7 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
            "Press ESC or run 'StopWorkflowMonitoring' to stop.", vbInformation
     
     ' =========================================================================
-    ' POLLING LOOP — check every 2s, force cloud sync every 5s
+    ' POLLING LOOP — check every 5s, force cloud sync every 15s
     ' =========================================================================
     Do While Not StopMonitoring And Timer - startTime < (maxWaitMinutes * 60)
         DoEvents
@@ -187,7 +187,7 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
         End If
         
         ' Periodic status update — show which workflows are still pending
-        If Int(Timer) Mod 10 < 2 Then
+        If Int(Timer) Mod 10 < 5 Then
             Dim statusMsg As String
             statusMsg = "Monitoring: "
             If Not subjectListComplete Then statusMsg = statusMsg & "Subject List "
@@ -197,8 +197,8 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
             End If
         End If
         
-        ' Wait 2 seconds before next check
-        Application.Wait (Now + TimeValue("0:00:02"))
+        ' Wait 5 seconds before next check
+        Application.Wait (Now + TimeValue("0:00:05"))
     Loop
     
     Application.StatusBar = False
@@ -208,7 +208,7 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
     ' =========================================================================
     If Not StopMonitoring And subjectListComplete And teachingStreamComplete Then
         RunAllMacros dashboardSheet, emailValue
-        FinalizeProcess dashboardSheet, emailValue
+        FinaliseProcess dashboardSheet, emailValue
         
         MsgBox "All processes finished!" & vbCrLf & vbCrLf & _
                "✓ Subject List Refresh" & vbCrLf & _
@@ -224,7 +224,7 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
         ' Timeout — proceed with whatever data is available
         MsgBox "Timeout reached. Running macros with current data...", vbExclamation
         RunAllMacros dashboardSheet, emailValue
-        FinalizeProcess dashboardSheet, emailValue
+        FinaliseProcess dashboardSheet, emailValue
     End If
     
     ' Disable silent mode and restore calculation
@@ -342,7 +342,7 @@ End Sub
 ' SendCompletionNotification
 ' Purpose: Send a completion email via Outlook with a link
 '          to the SharePoint output folder
-' Called by: FinalizeProcess
+' Called by: FinaliseProcess
 '---------------------------------------------------------------
 Sub SendCompletionNotification(dashboardSheet As Worksheet, emailValue As String)
     On Error Resume Next
@@ -399,6 +399,9 @@ Sub StopWorkflowMonitoring()
     
     SilentMode = False
     Application.Calculation = OriginalCalculationMode
+    
+    ' Hard stop all VBA execution
+    End
 End Sub
 
 '---------------------------------------------------------------

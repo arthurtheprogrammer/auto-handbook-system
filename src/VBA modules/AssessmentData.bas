@@ -90,7 +90,7 @@ Sub ParseAssessmentData()
     
     If Not dashboardSheet Is Nothing Then
         With dashboardSheet.Range("F4")
-            .Value = "Done"
+            .Value = "Complete"
             .Interior.Color = RGB(146, 208, 80)
         End With
         DoEvents

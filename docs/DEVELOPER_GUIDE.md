@@ -26,10 +26,12 @@ flowchart TD
     subgraph L1["Layer 1: Cloud Data Extraction"]
         PA1["Power Automate Flow 1<br/>(Subject List)"]
         PA2["Power Automate Flow 2<br/>(Teaching Stream)"]
+        PA3["Power Automate Flow 3<br/>(Assessment HTML Query)"]
         OS1["subjectListParser.osts"]
         OS2["teachingStreamParser.osts"]
         PA1 --> OS1
         PA2 --> OS2
+        PA3 -.-> |Mac Fallback| AD
     end
 
     subgraph L2["Layer 2: Web Scraping"]
@@ -61,8 +63,8 @@ When `GenerateMarkingSupport()` is called:
 | 1 | `Integration.bas` | Sets `SilentMode = True`, reads Dashboard params, validates year |
 | 2 | `SubjectListRefresh.bas` | HTTP POST to Power Automate → triggers `subjectListParser.osts` → populates `SubjectList` table |
 | 3 | `TeachingStreamRefresh.bas` | HTTP POST to Power Automate → triggers `teachingStreamParser.osts` → populates `teaching_stream` table |
-| 4 | `Integration.bas` | Monitors Dashboard F2 and F5 cells for "Done" (polling loop, 2s interval, 30min timeout) |
-| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment HTML from handbook.unimelb.edu.au). **Skipped on Mac** — Power Query is Windows-only |
+| 4 | `Integration.bas` | Monitors Dashboard F2 and F5 cells for "Done" (polling loop, 5s interval, 30min timeout) |
+| 5 | `HTMLQuery.bas` | Refreshes `AllSubjectsHTML` Power Query table (fetches assessment format). **On Mac**: skips PQ, optionally triggers **Assessment Query Workflow** and monitors cell F3 |
 | 6 | `AssessmentData.bas` | Parses HTML from `AllSubjectsHTML` → writes structured data to `assessment data parsed` sheet |
 | 7 | `CalculationSheets.bas` | Generates `FHY Calculations` and `SHY Calculations` sheets, exports to new `.xlsm` with `LecturerRefresh.bas` embedded |
 | 8 | `Integration.bas` | Sends email notification, sets `SilentMode = False` |
@@ -107,6 +109,20 @@ When `GenerateMarkingSupport()` is called:
 | Pagination | Staff table reads up to **5000 rows** (Power Automate default limit) |
 
 **Payload**: `{ "year": 2026, "teachingMatrixFilename": "...", "email": "..." }`
+
+#### Flow 3: Assessment Query Workflow (Mac Fallback)
+
+![Assessment Query Workflow](../src/power%20automate%20flows/assessment%20query%20workflow.png)
+
+| Property | Value |
+| -------- | ----- |
+| Trigger | HTTP POST from `HTMLQuery.bas` (Mac only) |
+| Source | Handbook Website (`https://handbook.unimelb.edu.au/`) |
+| Script | Excel Online "Run script" action (inline/custom script to write rows) |
+| Target | `AllSubjectsHTML` table in `AllSubjectsHTML` sheet |
+| Status Cell | Dashboard `F3` |
+
+**Payload**: `{ "year": 2026, "subjects": ["MGMT10001", "MKTG10001", ...] }`
 
 ### Layer 2: Web Scraping (Power Query)
 

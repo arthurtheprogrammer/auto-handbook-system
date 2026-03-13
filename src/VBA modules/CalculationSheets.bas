@@ -382,7 +382,7 @@ CleanExit:
     Else
         If Not dashboardSheet Is Nothing Then
             With dashboardSheet.Range("F6")
-                .Value = "Done"
+                .Value = "Complete"
                 .Interior.Color = RGB(146, 208, 80)
             End With
             DoEvents
