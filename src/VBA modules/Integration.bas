@@ -211,11 +211,11 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
         FinaliseProcess dashboardSheet, emailValue
         
         MsgBox "All processes finished!" & vbCrLf & vbCrLf & _
-               "✓ Subject List Refresh" & vbCrLf & _
-               "✓ Teaching Stream Refresh" & vbCrLf & _
-               "✓ HTML Download (Subject Queries)" & vbCrLf & _
-               "✓ Assessment Data Parsing" & vbCrLf & _
-               "✓ Calculation Sheets Generation", vbInformation
+               "- Subject List Refresh" & vbCrLf & _
+               "- Teaching Stream Refresh" & vbCrLf & _
+               "- Assessment Data HTML Query" & vbCrLf & _
+               "- Assessment Data Parsing" & vbCrLf & _
+               "- Calculation Sheets Generation", vbInformation
         
     ElseIf StopMonitoring Then
         MsgBox "Monitoring stopped by user.", vbInformation
