@@ -2193,8 +2193,12 @@ End Function
 
 '---------------------------------------------------------------
 ' AddRefreshButtonsToSheets
-' Purpose: Add a "Refresh Lecturer Data" button at cell L2 on
-'          each calculation sheet in the exported workbook
+' Purpose: Add a "Refresh Lecturer Data" button in row 2 of the
+'          "Lecturer/Instructors" column on each calculation sheet,
+'          and a bold warning note in row 3 spanning to the
+'          "Activity Code" column. Column positions are resolved
+'          dynamically from the header row so the code stays
+'          correct even if columns are reordered in future.
 ' Called by: ExportCalculationSheets
 '---------------------------------------------------------------
 
@@ -2216,21 +2220,61 @@ Sub AddRefreshButtonsToSheets(wb As Workbook)
         On Error GoTo ErrorHandler
         
         If Not calcSheet Is Nothing Then
+            ' ----------------------------------------------------------------
+            ' Resolve column positions dynamically from the header row (row 1)
+            ' ----------------------------------------------------------------
+            Dim lecturerCol As Integer
+            Dim activityCodeCol As Integer
+            lecturerCol = FindColumn(calcSheet, "Lecturer/Instructors")
+            activityCodeCol = FindColumn(calcSheet, "Activity Code")
+            
+            ' Fallback to hardcoded positions if headers not found
+            If lecturerCol = 0 Then
+                lecturerCol = 12   ' Column L (default)
+                LogMessage "WARNING: 'Lecturer/Instructors' header not found — falling back to col 12 (L)"
+            End If
+            If activityCodeCol = 0 Then
+                activityCodeCol = 15  ' Column O (default)
+                LogMessage "WARNING: 'Activity Code' header not found — falling back to col 15 (O)"
+            End If
+            
+            Dim lecturerColLetter As String
+            lecturerColLetter = Split(calcSheet.Cells(1, lecturerCol).Address(True, False), "$")(0)
+            
+            ' ----------------------------------------------------------------
+            ' Delete any existing buttons, then add the new one in row 2
+            ' ----------------------------------------------------------------
             On Error Resume Next
             calcSheet.Buttons.Delete
             Err.Clear
             On Error GoTo ErrorHandler
             
-            Set btn = calcSheet.Buttons.add(calcSheet.Range("L2").Left, calcSheet.Range("L2").Top, _
-                                      calcSheet.Range("L2").Width, calcSheet.Range("L2").Height)
+            Dim btnCell As Range
+            Set btnCell = calcSheet.Cells(2, lecturerCol)
+            
+            Set btn = calcSheet.Buttons.Add(btnCell.Left, btnCell.Top, btnCell.Width, btnCell.Height)
             
             With btn
                 .OnAction = "RefreshLecturerData"
                 .Caption = "Refresh Lecturer Data"
-                .name = "RefreshButton"
+                .Name = "RefreshButton"
             End With
             
-            LogMessage "Added refresh button to " & sheetNames(s) & " at L2"
+            LogMessage "Added refresh button to " & sheetNames(s) & " at " & lecturerColLetter & "2"
+            
+            ' ----------------------------------------------------------------
+            ' Write bold overwrite warning in row 3 of the Lecturer column
+            ' ----------------------------------------------------------------
+            Dim noteCell As Range
+            Set noteCell = calcSheet.Cells(3, lecturerCol)
+            
+            Dim activityCodeColLetter As String
+            activityCodeColLetter = Split(calcSheet.Cells(1, activityCodeCol).Address(True, False), "$")(0)
+            
+            noteCell.Value = "Notes in col " & lecturerColLetter & " to " & activityCodeColLetter & " will be overwritten by refresh"
+            noteCell.Font.Bold = True
+            
+            LogMessage "Added overwrite warning note to " & sheetNames(s) & " at " & lecturerColLetter & "3"
         End If
     Next s
     

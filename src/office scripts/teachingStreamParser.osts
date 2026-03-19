@@ -35,6 +35,15 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     return "";
   };
 
+  // Helper: try multiple keyword variations in priority order
+  const findJsonPropertyMulti = (obj: { [key: string]: string | undefined }, keywords: string[]): string => {
+    for (const kw of keywords) {
+      const result = findJsonProperty(obj, kw);
+      if (result) return result;
+    }
+    return "";
+  };
+
   try {
     // Use JSON inputs directly as objects (no parsing needed)
     const assignments: AssignmentEntry[] = lecturerStreamJson as AssignmentEntry[];
@@ -45,12 +54,17 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     // =================================================================================
     const statusMap = new Map<string, string>();
     statusesArray.forEach((item: StatusEntry) => {
-      // Staff sheet: match "Title Given Name Family Name" column for the display name
-      // and "Status DO NOT SORT" column for employment status
-      const name = findJsonProperty(item, "Title Given Name Family Name");
+      // Staff sheet: try multiple column name variations for the display name.
+      // The Teaching Matrix has used different headers over time:
+      //   "Title Given Name Family Name", "Name", etc.
+      const name = findJsonPropertyMulti(item, [
+        "Title Given Name Family Name",
+        "Name"
+      ]);
       const status = findJsonProperty(item, "Status");
       if (name.trim()) {
-        statusMap.set(name.trim(), status.trim());
+        // Key by normalised (lowercased) name for case-insensitive lookup
+        statusMap.set(name.trim().toLowerCase(), status.trim());
       }
     });
 
@@ -130,7 +144,7 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     const outputData: (string | number)[][] = [];
 
     dataMap.forEach((value, key) => {
-      const status: string = statusMap.get(value.lecturer) || "";
+      const status: string = statusMap.get(value.lecturer.toLowerCase()) || "";
       const activities: string = Array.from(value.activityIds).sort().join("; ");
       const streamCount: number = value.activityIds.size;
 

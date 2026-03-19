@@ -57,6 +57,22 @@ Public Sub RefreshLecturerData()
     Dim wb As Workbook
     Set wb = ActiveWorkbook
     
+    ' Validate that we are running from the exported calculation workbook,
+    ' not accidentally from the source file. FHY or SHY sheet must exist.
+    Dim hasFHY As Boolean, hasSHY As Boolean
+    On Error Resume Next
+    hasFHY = Not (wb.Sheets("FHY Calculations") Is Nothing)
+    hasSHY = Not (wb.Sheets("SHY Calculations") Is Nothing)
+    On Error GoTo 0
+    
+    If Not hasFHY And Not hasSHY Then
+        MsgBox "This workbook does not contain FHY or SHY Calculations sheets." & vbCrLf & vbCrLf & _
+               "Please run 'Refresh Lecturer Data' from the exported calculation workbook, " & _
+               "not from the source (Automated Handbook Data System) file.", _
+               vbExclamation, "Wrong Workbook"
+        Exit Sub
+    End If
+    
     Dim origScreenUpdating As Boolean
     Dim origCalculation As XlCalculation
     Dim origEnableEvents As Boolean
@@ -87,9 +103,10 @@ Public Sub RefreshLecturerData()
         GoTo CleanExit
     End If
     
-    ' STEP 1.5: Clear stale status in source file
-    Application.StatusBar = "Clearing prior workflow status..."
-    ClearSourceWorkflowStatus
+    ' STEP 1.5: Update progress bar in source file to "Running..." (Orange)
+    ' We can safely do this now because the 45-second fixed wait bypasses
+    ' Mac caching lock issues that previously ruined instant-polling.
+    SetTeachingStreamRunningStatus
     
     ' STEP 2: Trigger Teaching Matrix workflow
     Application.StatusBar = "Triggering Teaching Matrix workflow..."
@@ -101,20 +118,12 @@ Public Sub RefreshLecturerData()
     End If
     
     MsgBox "Teaching Matrix workflow triggered successfully!" & vbCrLf & vbCrLf & _
-           "Monitoring for completion... (usually <1 minute)" & vbCrLf & vbCrLf & _
-           "Please wait while the workflow processes.", vbInformation, "Workflow Started"
+           "Please wait ~45 seconds for the cloud workflow to process the new data." & vbCrLf & vbCrLf & _
+           "You can track the progress in the Status Bar at the bottom left.", vbInformation, "Workflow Started"
     
     ' STEP 3: Wait for Teaching Matrix workflow completion
-    Application.StatusBar = "Waiting for Teaching Matrix workflow to complete..."
-    
-    If Not WaitForTeachingMatrixWorkflowCompletion(120) Then  ' 2 minute timeout
-        Dim response As VbMsgBoxResult
-        response = MsgBox("Teaching Matrix workflow did not complete within 2 minutes." & vbCrLf & vbCrLf & _
-                         "The workflow may still be running in the background." & vbCrLf & vbCrLf & _
-                         "Continue refresh with potentially outdated data?", _
-                         vbQuestion + vbYesNo, "Workflow Timeout")
-        If response = vbNo Then GoTo CleanExit
-    End If
+    ' We now use a fixed 45-second wait to bypass Mac cache/sync delays.
+    WaitForTeachingMatrixWorkflowCompletion
     
     Application.StatusBar = "Workflow complete! Refreshing lecturer data..."
     
@@ -157,8 +166,8 @@ CleanExit:
     If updateCount > 0 Then
         MsgBox "Lecturer data refreshed successfully!" & vbCrLf & vbCrLf & _
                "Updated " & updateCount & " subject(s)." & vbCrLf & vbCrLf & _
-               "- Lecturer names, status, activity codes refreshed (columns L-O)" & vbCrLf & _
-               "- Your notes and enrolments preserved (columns P, S)", vbInformation, "Refresh Complete"
+               "¥ Lecturer names, status, activity codes refreshed (columns L-O)" & vbCrLf & _
+               "¥ Your notes and enrolments preserved (columns P, S)", vbInformation, "Refresh Complete"
     End If
     Exit Sub
     
@@ -186,7 +195,13 @@ Private Function GetSourceParameters(ByRef yearValue As String, ByRef teachingMa
     
     ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
     Dim sourceWb As Workbook
-    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
+    Dim weOpenedIt As Boolean
+    Set sourceWb = FindAlreadyOpenWorkbook(SOURCE_FILE_PATH)
+    
+    If sourceWb Is Nothing Then
+        Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
+        weOpenedIt = True
+    End If
     
     If sourceWb Is Nothing Then Exit Function
     
@@ -202,7 +217,8 @@ Private Function GetSourceParameters(ByRef yearValue As String, ByRef teachingMa
         GetSourceParameters = (yearValue <> "" And IsNumeric(yearValue))
     End If
     
-    sourceWb.Close SaveChanges:=False
+    ' Only close if we opened it — don't close a file the user has open
+    If weOpenedIt Then sourceWb.Close SaveChanges:=False
     
     On Error GoTo 0
 End Function
@@ -242,158 +258,196 @@ End Function
 
 '---------------------------------------------------------------
 ' WaitForTeachingMatrixWorkflowCompletion
-' Purpose: Poll the source Dashboard F5 cell every 3 seconds
-'          until it shows DONE/COMPLETE/FINISHED or timeout
-' Returns: True if workflow completed
+' Purpose: Wait 45 seconds for the Power Automate workflow to
+'          complete and SharePoint to sync the updated file.
+'          Polling is unreliable on Mac due to OneDrive caching.
+' Returns: True after wait completes
 '---------------------------------------------------------------
-Private Function WaitForTeachingMatrixWorkflowCompletion(maxWaitSeconds As Long) As Boolean
-    On Error Resume Next
+Private Function WaitForTeachingMatrixWorkflowCompletion() As Boolean
+    Dim waitSeconds As Integer
+    waitSeconds = 45
     
-    WaitForTeachingMatrixWorkflowCompletion = False
-    
-    Dim startTime As Double
-    Dim elapsedTime As Double
-    Dim checkCount As Long
-    
-    startTime = Timer
-    checkCount = 0
-    
-    Do
+    Dim i As Integer
+    For i = waitSeconds To 1 Step -1
+        Application.StatusBar = "Waiting for cloud workflow to process (" & i & "s remaining)..."
+        Application.Wait (Now + TimeValue("0:00:01"))
         DoEvents
-        checkCount = checkCount + 1
-        
-        ' Check workflow status
-        Dim currentStatus As String
-        currentStatus = GetTeachingMatrixWorkflowStatus()
-        
-        ' Update status every 5 checks (~15 seconds)
-        If checkCount Mod 5 = 0 Then
-            elapsedTime = Timer - startTime
-            If elapsedTime < 0 Then elapsedTime = elapsedTime + 86400
-            Application.StatusBar = "Workflow status: " & currentStatus & " (elapsed: " & Format(elapsedTime, "0") & "s)"
-        End If
-        
-        ' Check if complete
-        Dim statusUpper As String
-        statusUpper = UCase(Trim(currentStatus))
-        
-        If statusUpper = "DONE" Or statusUpper = "COMPLETE" Or statusUpper = "FINISHED" Or statusUpper = "SUCCESS" Then
-            Application.StatusBar = "Teaching Matrix workflow completed successfully!"
-            UpdateSourceWorkflowComplete
-            WaitForTeachingMatrixWorkflowCompletion = True
-            Exit Function
-        End If
-        
-        ' Check timeout
-        elapsedTime = Timer - startTime
-        If elapsedTime < 0 Then elapsedTime = elapsedTime + 86400
-        
-        If elapsedTime > maxWaitSeconds Then
-            Application.StatusBar = "Workflow timeout reached"
-            Exit Function
-        End If
-        
-        ' Wait 3 seconds before next check
-        Application.Wait (Now + TimeValue("0:00:03"))
-        
-    Loop
+    Next i
     
+    Application.StatusBar = "Workflow wait complete. Fetching fresh data..."
+    WaitForTeachingMatrixWorkflowCompletion = True
+End Function
+
+'---------------------------------------------------------------
+' FindAlreadyOpenWorkbook
+' Purpose: Check whether a workbook from a given path is already
+'          open in this Excel session. Returns Nothing if not found.
+'          Prevents accidental double-open or closing user files.
+'---------------------------------------------------------------
+Private Function FindAlreadyOpenWorkbook(filePath As String) As Workbook
+    On Error Resume Next
+    
+    Dim wb As Workbook
+    Dim targetName As String
+    
+    ' Extract bare filename for fallback name-match (SharePoint paths vary)
+    Dim parts() As String
+    parts = Split(filePath, "/")
+    targetName = parts(UBound(parts))
+    
+    For Each wb In Workbooks
+        If wb.FullName = filePath Then
+            Set FindAlreadyOpenWorkbook = wb
+            Exit Function
+        End If
+        If LCase(wb.Name) = LCase(targetName) Then
+            Set FindAlreadyOpenWorkbook = wb
+            Exit Function
+        End If
+    Next wb
+    
+    Set FindAlreadyOpenWorkbook = Nothing
     On Error GoTo 0
 End Function
 
 '---------------------------------------------------------------
-' GetTeachingMatrixWorkflowStatus
-' Purpose: Open source file read-only and read the current
-'          workflow status from Dashboard F5
-' Returns: Status string (e.g. "DONE", "Not Started")
+' ClearTeachingStreamStatus
+' Purpose: Reset the progress_bar "Teaching Stream" status to empty
+'          before triggering the workflow, so monitoring starts clean
+'          and doesn't detect stale "Done" from a previous run.
+' Called by: RefreshLecturerData (before TriggerTeachingMatrixWorkflow)
 '---------------------------------------------------------------
-Private Function GetTeachingMatrixWorkflowStatus() As String
-    On Error Resume Next
-    
-    GetTeachingMatrixWorkflowStatus = "Unknown"
-    
-    ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
-    Dim sourceWb As Workbook
-    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
-    
-    If Not sourceWb Is Nothing Then
-        Dim sourceSheet As Worksheet
-        Set sourceSheet = sourceWb.Sheets("Dashboard")
-        
-        If Not sourceSheet Is Nothing Then
-            Dim cellValue As String
-            cellValue = Trim(CStr(sourceSheet.Range("F5").Value))
-            
-            If cellValue <> "" Then
-                GetTeachingMatrixWorkflowStatus = cellValue
-            Else
-                GetTeachingMatrixWorkflowStatus = "Not Started"
-            End If
-        End If
-        
-        sourceWb.Close SaveChanges:=False
-    End If
-    
-    On Error GoTo 0
-End Function
-
-'---------------------------------------------------------------
-' ClearSourceWorkflowStatus
-' Purpose: Open source workbook read/write and reset F5 to
-'          "Running..." (orange) to prevent stale status from
-'          a prior run causing false early completion
-' Called by: RefreshLecturerData (before triggering workflow)
-'---------------------------------------------------------------
-Private Sub ClearSourceWorkflowStatus()
+Private Sub ClearTeachingStreamStatus()
     On Error Resume Next
     
     Dim sourceWb As Workbook
-    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+    Dim weOpenedIt As Boolean
+    Set sourceWb = FindAlreadyOpenWorkbook(SOURCE_FILE_PATH)
     
-    If Not sourceWb Is Nothing Then
-        Dim sourceSheet As Worksheet
-        Set sourceSheet = sourceWb.Sheets("Dashboard")
-        
-        If Not sourceSheet Is Nothing Then
-            With sourceSheet.Range("F5")
-                .Value = "Running..."
-                .Interior.Color = RGB(255, 192, 0)  ' Orange
-            End With
-        End If
-        
-        sourceWb.Save
-        sourceWb.Close SaveChanges:=False
+    If sourceWb Is Nothing Then
+        Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+        weOpenedIt = True
     End If
+    
+    If sourceWb Is Nothing Then Exit Sub
+    
+    Dim dashSheet As Worksheet
+    Set dashSheet = sourceWb.Sheets("Dashboard")
+    If dashSheet Is Nothing Then
+        If weOpenedIt Then sourceWb.Close SaveChanges:=False
+        Exit Sub
+    End If
+    
+    ' Clear via progress_bar table
+    Dim tbl As ListObject
+    Set tbl = dashSheet.ListObjects("progress_bar")
+    
+    If Not tbl Is Nothing And tbl.DataBodyRange.Rows.Count > 0 Then
+        Dim progressCol As Long, statusCol As Long
+        progressCol = 0
+        statusCol = 0
+        
+        Dim c As Long
+        For c = 1 To tbl.HeaderRowRange.Columns.Count
+            Dim hdrVal As String
+            hdrVal = LCase(Trim(CStr(tbl.HeaderRowRange.Cells(1, c).Value)))
+            If InStr(hdrVal, "progress") > 0 Then progressCol = c
+            If InStr(hdrVal, "status") > 0 Then statusCol = c
+        Next c
+        
+        If progressCol > 0 And statusCol > 0 Then
+            Dim r As Long
+            For r = 1 To tbl.DataBodyRange.Rows.Count
+                Dim rowLabel As String
+                rowLabel = LCase(Trim(CStr(tbl.DataBodyRange.Cells(r, progressCol).Value)))
+                If InStr(rowLabel, "teaching stream") > 0 Then
+                    tbl.DataBodyRange.Cells(r, statusCol).Value = ""
+                    tbl.DataBodyRange.Cells(r, statusCol).Interior.ColorIndex = xlNone
+                    Exit For
+                End If
+            Next r
+        End If
+    End If
+    
+    ' Also clear raw F5 for legacy compat
+    dashSheet.Range("F5").Value = ""
+    dashSheet.Range("F5").Interior.ColorIndex = xlNone
+    
+    sourceWb.Save
+    If weOpenedIt Then sourceWb.Close SaveChanges:=False
     
     On Error GoTo 0
 End Sub
 
 '---------------------------------------------------------------
-' UpdateSourceWorkflowComplete
-' Purpose: Open source workbook and set F5 to "Updated" (green)
-'          to indicate the lecturer refresh detected completion
-' Called by: WaitForTeachingMatrixWorkflowCompletion
+' SetTeachingStreamRunningStatus
+' Purpose: Update the progress_bar "Teaching Stream" status to
+'          "Running..." (Orange) before triggering the workflow,
+'          providing visual feedback on the master dashboard.
+' Called by: RefreshLecturerData 
 '---------------------------------------------------------------
-Private Sub UpdateSourceWorkflowComplete()
+Private Sub SetTeachingStreamRunningStatus()
     On Error Resume Next
     
     Dim sourceWb As Workbook
-    Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+    Dim weOpenedIt As Boolean
+    Set sourceWb = FindAlreadyOpenWorkbook(SOURCE_FILE_PATH)
     
-    If Not sourceWb Is Nothing Then
-        Dim sourceSheet As Worksheet
-        Set sourceSheet = sourceWb.Sheets("Dashboard")
-        
-        If Not sourceSheet Is Nothing Then
-            With sourceSheet.Range("F5")
-                .Value = "Updated"
-                .Interior.Color = RGB(146, 208, 80)  ' Green
-            End With
-        End If
-        
-        sourceWb.Save
-        sourceWb.Close SaveChanges:=False
+    If sourceWb Is Nothing Then
+        Set sourceWb = Workbooks.Open(SOURCE_FILE_PATH, ReadOnly:=False, UpdateLinks:=False, Notify:=False)
+        weOpenedIt = True
     End If
+    
+    If sourceWb Is Nothing Then Exit Sub
+    
+    Dim dashSheet As Worksheet
+    Set dashSheet = sourceWb.Sheets("Dashboard")
+    If dashSheet Is Nothing Then
+        If weOpenedIt Then sourceWb.Close SaveChanges:=False
+        Exit Sub
+    End If
+    
+    ' Clear via progress_bar table
+    Dim tbl As ListObject
+    Set tbl = dashSheet.ListObjects("progress_bar")
+    
+    If Not tbl Is Nothing And tbl.DataBodyRange.Rows.Count > 0 Then
+        Dim progressCol As Long, statusCol As Long
+        progressCol = 0
+        statusCol = 0
+        
+        Dim c As Long
+        For c = 1 To tbl.HeaderRowRange.Columns.Count
+            Dim hdrVal As String
+            hdrVal = LCase(Trim(CStr(tbl.HeaderRowRange.Cells(1, c).Value)))
+            If InStr(hdrVal, "progress") > 0 Then progressCol = c
+            If InStr(hdrVal, "status") > 0 Then statusCol = c
+        Next c
+        
+        If progressCol > 0 And statusCol > 0 Then
+            Dim r As Long
+            For r = 1 To tbl.DataBodyRange.Rows.Count
+                Dim rowLabel As String
+                rowLabel = LCase(Trim(CStr(tbl.DataBodyRange.Cells(r, progressCol).Value)))
+                If InStr(rowLabel, "teaching stream") > 0 Then
+                    With tbl.DataBodyRange.Cells(r, statusCol)
+                        .Value = "Running..."
+                        .Interior.Color = RGB(255, 192, 0) ' Orange
+                    End With
+                    Exit For
+                End If
+            Next r
+        End If
+    End If
+    
+    ' Also update raw F5 for legacy compat
+    With dashSheet.Range("F5")
+        .Value = "Running..."
+        .Interior.Color = RGB(255, 192, 0)
+    End With
+    
+    sourceWb.Save
+    If weOpenedIt Then sourceWb.Close SaveChanges:=False
     
     On Error GoTo 0
 End Sub
@@ -554,7 +608,19 @@ End Sub
 Private Function LoadTeachingStreamData(sourcePath As String) As Variant
     On Error GoTo ErrorHandler
     
-    ' sourceWb = "Automated Handbook Data System.xlsm" on SharePoint
+    ' Close any stale in-memory copy so we read FRESH post-workflow data.
+    ' The Office Script updates the server copy; the local open copy
+    ' still has pre-refresh teaching stream data.
+    On Error Resume Next
+    Dim staleWb As Workbook
+    Set staleWb = FindAlreadyOpenWorkbook(sourcePath)
+    If Not staleWb Is Nothing Then
+        If staleWb.Name <> ActiveWorkbook.Name Then
+            staleWb.Close SaveChanges:=False
+        End If
+    End If
+    On Error GoTo ErrorHandler
+    
     Dim sourceWb As Workbook
     Set sourceWb = Workbooks.Open(sourcePath, ReadOnly:=True, UpdateLinks:=False, Notify:=False)
     
@@ -567,29 +633,87 @@ Private Function LoadTeachingStreamData(sourcePath As String) As Variant
     Set sourceSheet = sourceWb.Sheets(TEACHING_STREAM_SHEET)
     
     If sourceSheet Is Nothing Then
-        sourceWb.Close SaveChanges:=False
+        If sourceWb.Name <> ActiveWorkbook.Name Then sourceWb.Close SaveChanges:=False
         LoadTeachingStreamData = Empty
         Exit Function
     End If
     
-    Dim lastRow As Long
-    lastRow = sourceSheet.Cells(sourceSheet.Rows.Count, "B").End(xlUp).Row
+    ' Read from the teaching_stream table dynamically to avoid column shifting issues
+    On Error Resume Next
+    Dim tbl As ListObject
+    Set tbl = sourceSheet.ListObjects("teaching_stream")
+    On Error GoTo ErrorHandler
     
-    If lastRow < 2 Then
-        sourceWb.Close SaveChanges:=False
+    If tbl Is Nothing Or tbl.DataBodyRange Is Nothing Then
+        If sourceWb.Name <> ActiveWorkbook.Name Then sourceWb.Close SaveChanges:=False
         LoadTeachingStreamData = Empty
         Exit Function
     End If
     
-    ' Columns B–G: Subject Code, Study Period, Lecturer, Status, Activity Code, Streams
-    LoadTeachingStreamData = sourceSheet.Range(sourceSheet.Cells(2, 2), sourceSheet.Cells(lastRow, 7)).Value
+    Dim rowCount As Long
+    rowCount = tbl.DataBodyRange.Rows.Count
     
-    sourceWb.Close SaveChanges:=False
+    If rowCount = 0 Then
+        If sourceWb.Name <> ActiveWorkbook.Name Then sourceWb.Close SaveChanges:=False
+        LoadTeachingStreamData = Empty
+        Exit Function
+    End If
+    
+    ' Find column indices dynamically
+    Dim colSubj As Long, colPeriod As Long, colLec As Long
+    Dim colStatus As Long, colAct As Long, colStreams As Long
+    
+    Dim c As Long
+    For c = 1 To tbl.HeaderRowRange.Columns.Count
+        Dim hdr As String
+        hdr = LCase(Trim(CStr(tbl.HeaderRowRange.Cells(1, c).Value)))
+        
+        If hdr = "subject code" Then colSubj = c
+        If hdr = "study period" Or hdr = "teaching period" Then colPeriod = c
+        If hdr = "lecturer" Or hdr = "name" Or hdr = "display name" Then colLec = c
+        If hdr = "status" Then colStatus = c
+        If InStr(hdr, "activity id") > 0 Or InStr(hdr, "activity code") > 0 Then colAct = c
+        If hdr = "streams" Or hdr = "stream count" Then colStreams = c
+    Next c
+    
+    ' Fallback to old hardcoded offsets if table headers are completely unrecognized
+    ' (The Office Script writes array: Key, Subj, Period, Lec, Status, Act, Streams)
+    If colSubj = 0 Or colLec = 0 Then
+        colSubj = 2
+        colPeriod = 3
+        colLec = 4
+        colStatus = 5
+        colAct = 6
+        colStreams = 7
+    End If
+    
+    ' Extract data into a standard 6-column array
+    ' 1: Subject Code, 2: Study Period, 3: Lecturer, 4: Status, 5: Activity Code, 6: Streams
+    Dim outData() As Variant
+    ReDim outData(1 To rowCount, 1 To 6)
+    
+    Dim r As Long
+    For r = 1 To rowCount
+        outData(r, 1) = tbl.DataBodyRange.Cells(r, colSubj).Value
+        
+        If colPeriod > 0 Then outData(r, 2) = tbl.DataBodyRange.Cells(r, colPeriod).Value
+        outData(r, 3) = tbl.DataBodyRange.Cells(r, colLec).Value
+        
+        If colStatus > 0 Then outData(r, 4) = tbl.DataBodyRange.Cells(r, colStatus).Value
+        If colAct > 0 Then outData(r, 5) = tbl.DataBodyRange.Cells(r, colAct).Value
+        If colStreams > 0 Then outData(r, 6) = tbl.DataBodyRange.Cells(r, colStreams).Value
+    Next r
+    
+    LoadTeachingStreamData = outData
+    
+    If sourceWb.Name <> ActiveWorkbook.Name Then sourceWb.Close SaveChanges:=False
     Exit Function
     
 ErrorHandler:
     On Error Resume Next
-    If Not sourceWb Is Nothing Then sourceWb.Close SaveChanges:=False
+    If Not sourceWb Is Nothing Then
+        If sourceWb.Name <> ActiveWorkbook.Name Then sourceWb.Close SaveChanges:=False
+    End If
     On Error GoTo 0
     LoadTeachingStreamData = Empty
 End Function
@@ -613,6 +737,17 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
     
     Dim i As Long
     
+    ' =========================================================================
+    ' Row-offset tracking — when rows are inserted into a sheet for subject N,
+    ' all subsequent subjects on the SAME sheet have stale cached row numbers.
+    ' We accumulate the delta here and apply it at read time.
+    ' Reset to 0 whenever we switch to a different sheet.
+    ' =========================================================================
+    Dim rowOffset As Long
+    Dim currentSheetName As String
+    rowOffset = 0
+    currentSheetName = ""
+    
     For i = 1 To subjectBlocks.Count
         Dim blockInfo As Variant
         blockInfo = subjectBlocks(i)
@@ -620,6 +755,12 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
         Dim calcSheet As Worksheet
         Set calcSheet = wb.Sheets(CStr(blockInfo(SBI_SHEETNAME)))
         calcSheet.Unprotect
+        
+        ' Reset offset when moving to a new sheet
+        If CStr(blockInfo(SBI_SHEETNAME)) <> currentSheetName Then
+            currentSheetName = CStr(blockInfo(SBI_SHEETNAME))
+            rowOffset = 0
+        End If
         
         ' Mac-safe type casting — Variant→String before passing to match function
         Dim blockSubjectCode As String
@@ -646,8 +787,15 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
             Dim firstLecturerRow As Long
             Dim availableRows As Long
             
-            headerRow = CLng(blockInfo(SBI_HEADERROW))
-            totalRow = CLng(blockInfo(SBI_TOTALROW))
+            ' Apply cumulative offset so stale cached indices become correct
+            headerRow = CLng(blockInfo(SBI_HEADERROW)) + rowOffset
+            
+            ' Re-verify totalRow live from the sheet — the cached value may be
+            ' stale if a prior (buggy) refresh inserted rows at the wrong place.
+            ' FindTotalRow scans from headerRow forward looking for "Total" in col E,
+            ' so it always locates the real current position regardless of history.
+            totalRow = FindTotalRow(calcSheet, headerRow)
+            
             firstLecturerRow = headerRow + 1
             availableRows = totalRow - firstLecturerRow  ' Rows between header and Total
             
@@ -683,20 +831,25 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
                     totalRow = totalRow + 1
                 Next j
                 
+                ' Accumulate the offset so later subjects on this sheet are corrected
+                rowOffset = rowOffset + rowsToAdd
+                
                 ' Recalculate available rows
                 availableRows = totalRow - firstLecturerRow
             End If
             
             ' =========================================================================
-            ' CLEAR OLD DATA — columns L–O only; columns P–S are user-edited
+            ' CLEAR OLD DATA — columns L–O values AND bold formatting;
+            ' columns P–S are user-edited and NOT touched.
+            ' ClearContents only clears values; bold from shifted rows persists
+            ' unless we explicitly reset it.
             ' =========================================================================
             Dim Row As Long
             For Row = firstLecturerRow To totalRow - 1
-                calcSheet.Cells(Row, 12).ClearContents  ' Column L: Lecturer Name
-                calcSheet.Cells(Row, 13).ClearContents  ' Column M: Status
-                calcSheet.Cells(Row, 14).ClearContents  ' Column N: Stream Number
-                calcSheet.Cells(Row, 15).ClearContents  ' Column O: Activity Code
-                ' Columns P-S are NOT touched (preserve user edits)
+                Dim clearRange As Range
+                Set clearRange = calcSheet.Range(calcSheet.Cells(Row, 12), calcSheet.Cells(Row, 15))
+                clearRange.ClearContents
+                clearRange.Font.Bold = False
             Next Row
             
             ' =========================================================================
@@ -733,6 +886,7 @@ Private Function UpdateAllLecturers(wb As Workbook, teachingData As Variant, sub
     
     On Error GoTo 0
 End Function
+
 
 '---------------------------------------------------------------
 ' ApplyLecturerFormulas
