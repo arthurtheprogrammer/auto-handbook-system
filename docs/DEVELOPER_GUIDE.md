@@ -83,6 +83,8 @@ When `GenerateMarkingSupport()` is called:
 4. The Office Script parses and writes data to the appropriate table
 5. The Office Script writes `"Done"` to the `progress_bar` table as a completion signal
 
+> **Status values written by Office Scripts**: `"Done"` = script completed successfully. `"Error"` = script caught an exception (written from the `catch` block before returning). The VBA monitoring loop (`MonitorAndExecute`) detects both. `"Complete"` = VBA confirmed the `Done` and overwrote the cell after verified detection.
+>
 > **"Done" vs "Complete"**: `Done` = the Power Automate flow finished successfully. `Complete` = the VBA monitoring loop (`MonitorAndExecute`) detected the update and proceeded. If the Dashboard shows `Done` but the process stalls, the VBA polling may have timed out.
 
 #### Flow 1: Subject List Refresh
@@ -177,10 +179,11 @@ The `AllSubjectsHTML` Power Query:
 | Function | Purpose |
 | -------- | ------- |
 | `GenerateMarkingSupport()` | Main entry point. Sets SilentMode, validates params, triggers workflows, monitors, runs macros |
-| `MonitorAndExecute()` | Polling loop that watches F2/F5 for completion, then calls `RunAllMacros` |
+| `MonitorAndExecute()` | Polling loop that watches F2/F5 every 5s for `"Done"` or `"Error"`. Exits immediately on either; skips macros if any workflow errored |
 | `RunAllMacros()` | Sequential execution: HTMLQuery → AssessmentData → CalculationSheets |
 | `ForceCloudSync()` | Saves workbook, refreshes all, forces recalculation (for SharePoint sync) |
-| `CheckWorkflowComplete()` | Checks if a cell value is "DONE"/"COMPLETE"/"FINISHED" |
+| `CheckWorkflowComplete()` | Checks if a cell value is `"DONE"`/`"COMPLETE"`/`"FINISHED"` — colours green |
+| `CheckWorkflowError()` | **New** — checks if a cell value is `"ERROR"` — colours red. Enables fast failure detection without waiting for timeout |
 | `FinalizeProcess()` | Freezes elapsed time, sends email notification |
 | `SendRequestMac()` / `SendRequestWindows()` | Platform-specific HTTP POST functions |
 | `StopWorkflowMonitoring()` | User-callable macro to abort monitoring |
@@ -191,6 +194,8 @@ The `AllSubjectsHTML` Power Query:
 - `Public SilentMode As Boolean` — suppresses MsgBox in sub-modules during integrated runs
 - `Public StopMonitoring As Boolean` — flag to abort the monitoring loop
 - `Public OriginalCalculationMode As XlCalculation` — saved calc mode for restoration
+- `Public SubjectListErrored As Boolean` — set when F2 reads `"Error"`; prevents macros from running
+- `Public TeachingStreamErrored As Boolean` — set when F5 reads `"Error"`; prevents macros from running
 
 ### SubjectListRefresh.bas
 
@@ -381,6 +386,7 @@ The system supports both **Mac** and **Windows**:
   - Mac: `MacScript("do shell script ""curl ...""")` via AppleScript
   - Windows: `MSXML2.XMLHTTP` / `MSXML2.ServerXMLHTTP` COM objects
 - `Integration.bas` monitors F3 status during integrated runs. On Mac, F3 shows **"Running..."** during the cloud workflow, **"Complete"** when done, **"Timeout"** if the 5-minute poll expires, or **"Skipped"** (grey) if the user opts out
+- **Office Scripts write `"Error"` on failure** — the `catch` block in both `subjectListParser.osts` and `teachingStreamParser.osts` writes `"Error"` to the `progress_bar` status cell before returning. This allows the VBA poll loop to detect failures within the next 5-second tick rather than waiting for the 30-minute timeout
 - Path separators handled via `Application.PathSeparator`
 - `LecturerRefresh.bas` uses Mac-compatible 2D arrays instead of Collections for return types
 
@@ -395,10 +401,12 @@ The system supports both **Mac** and **Windows**:
 3. Ensure the year in `C2` is valid (≥ 2025)
 4. Check if the Power Automate flow is turned on in the Power Automate portal
 
-### Monitoring times out (30 minutes)
+### Monitoring times out (30 minutes) or reports an error
 
 1. Check if the Power Automate flow ran successfully in the portal
-2. Verify the Office Script updated `F2`/`F5` to "Done" on the Dashboard
+2. Verify the Office Script updated `F2`/`F5` to `"Done"` or `"Error"` on the Dashboard
+   - `"Error"` means the Office Script caught an exception — check the Script run history in Power Automate for the error message
+   - If the cell still shows `"Running..."`, the script may have been throttled or the flow may not have reached the script step
 3. The `progress_bar` table may not have a matching row for "Subject List" or "Teaching Stream"
 4. Cloud sync issues — SharePoint may not be pushing updates to the local workbook
 

@@ -23,6 +23,34 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     [key: string]: string | undefined;
   }
 
+  // Helper: write a status value to the progress_bar row matching a label
+  // Rule 2: success = "Done", failure = "Error" (never rethrow from catch)
+  const writeProgressStatus = (label: string, status: string, color: string): void => {
+    try {
+      const dashboardWs = workbook.getWorksheet("Dashboard");
+      if (!dashboardWs) return;
+      const progressTable = dashboardWs.getTable("progress_bar");
+      if (!progressTable) return;
+      const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
+      if (!progressRange) return;
+      const progressData = progressRange.getValues();
+      const headers = progressTable.getHeaderRowRange().getValues()[0];
+      const progressColIndex = headers.findIndex(h => String(h).toLowerCase().includes("progress"));
+      const statusColIndex = headers.findIndex(h => String(h).toLowerCase().includes("status"));
+      if (progressColIndex === -1 || statusColIndex === -1) return;
+      for (let r = 0; r < progressData.length; r++) {
+        if (String(progressData[r][progressColIndex]).trim().toLowerCase().includes(label.toLowerCase())) {
+          const statusCell = progressRange.getCell(r, statusColIndex);
+          statusCell.setValue(status);
+          statusCell.getFormat().getFill().setColor(color);
+          break;
+        }
+      }
+    } catch {
+      // Non-critical — swallow silently
+    }
+  };
+
   // Helper function to find JSON property by keyword (handles line breaks and whitespace in headers)
   const findJsonProperty = (obj: { [key: string]: string | undefined }, keyword: string): string => {
     const normalizedKeyword = keyword.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -169,52 +197,10 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     console.log(`Successfully processed ${dataMap.size} unique lecturer assignments.`);
 
     // =========================================================================
-    // UPDATE PROGRESS BAR TABLE IN DASHBOARD
+    // UPDATE PROGRESS BAR — "Done" on success (Rule 2)
     // =========================================================================
-    try {
-      const dashboardWs = workbook.getWorksheet("Dashboard");
-      if (dashboardWs) {
-        const progressTable = dashboardWs.getTable("progress_bar");
-        if (progressTable) {
-          // Get all data from progress_bar table
-          const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
-          if (progressRange) {
-            const progressData = progressRange.getValues();
-
-            // Find column indices
-            const headers = progressTable.getHeaderRowRange().getValues()[0];
-            const progressColIndex = headers.findIndex(h =>
-              String(h).toLowerCase().includes("progress")
-            );
-            const statusColIndex = headers.findIndex(h =>
-              String(h).toLowerCase().includes("status")
-            );
-
-            if (progressColIndex !== -1 && statusColIndex !== -1) {
-              // Find the row where Progress column contains "Teaching Stream"
-              for (let r = 0; r < progressData.length; r++) {
-                const progressValue = String(progressData[r][progressColIndex]).trim();
-                if (progressValue.toLowerCase().includes("teaching stream")) {
-                  // Update Status column to "Done"
-                  const statusCell = progressRange.getCell(r, statusColIndex);
-                  statusCell.setValue("Done");
-
-                  // Optional: Set cell color to green
-                  statusCell.getFormat().getFill().setColor("#92D050"); // Light green
-
-                  console.log(`Updated progress_bar: Teaching Stream -> Done`);
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    // Progress bar update is non-critical — errors should not fail the script
-    } catch (progressError) {
-      const progressErrMsg = progressError instanceof Error ? progressError.message : String(progressError);
-      console.log("Warning: Could not update progress_bar table: " + progressErrMsg);
-    }
+    writeProgressStatus("teaching stream", "Done", "#92D050");
+    console.log(`Updated progress_bar: Teaching Stream -> Done`);
 
     return {
       success: true,
@@ -223,7 +209,7 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     };
 
   } catch (error) {
-    // Improved error handling
+    // Rule 3: catch does NOT rethrow — write "Error" to progress_bar, then return
     let errorMessage = "Unknown error occurred";
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -234,6 +220,10 @@ function main(workbook: ExcelScript.Workbook, lecturerStreamJson: object, lectur
     }
 
     console.log("Error processing data: " + errorMessage);
+
+    // Rule 2: write "Error" status so VBA poll loop detects failure immediately
+    writeProgressStatus("teaching stream", "Error", "#FF0000");
+
     return {
       success: false,
       error: errorMessage,

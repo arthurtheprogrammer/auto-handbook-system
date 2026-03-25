@@ -19,6 +19,35 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     [key: string]: string | undefined;
   }
 
+  // Helper: write a status value to the progress_bar row matching a label
+  // Rule 2: success = "Done", failure = "Error" (never rethrow from catch)
+  // NOTE: declared BEFORE the outer try so it is accessible in both try and catch
+  const writeProgressStatus = (label: string, status: string, color: string): void => {
+    try {
+      const dashboardWs = workbook.getWorksheet("Dashboard");
+      if (!dashboardWs) return;
+      const progressTable = dashboardWs.getTable("progress_bar");
+      if (!progressTable) return;
+      const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
+      if (!progressRange) return;
+      const progressData = progressRange.getValues();
+      const headers = progressTable.getHeaderRowRange().getValues()[0];
+      const progressColIndex = headers.findIndex(h => String(h).toLowerCase().includes("progress"));
+      const statusColIndex = headers.findIndex(h => String(h).toLowerCase().includes("status"));
+      if (progressColIndex === -1 || statusColIndex === -1) return;
+      for (let r = 0; r < progressData.length; r++) {
+        if (String(progressData[r][progressColIndex]).trim().toLowerCase().includes(label.toLowerCase())) {
+          const statusCell = progressRange.getCell(r, statusColIndex);
+          statusCell.setValue(status);
+          statusCell.getFormat().getFill().setColor(color);
+          break;
+        }
+      }
+    } catch {
+      // Non-critical — swallow silently
+    }
+  };
+
   try {
     console.log(`Script started. Received ${subjectData?.length || 0} subjects, year: ${year}, iteration: ${iterationDate}`);
 
@@ -196,44 +225,10 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     console.log(`Successfully processed ${subjects.length} subject records.`);
 
     // =========================================================================
-    // UPDATE PROGRESS BAR TABLE IN DASHBOARD
+    // UPDATE PROGRESS BAR — "Done" on success (Rule 2)
     // =========================================================================
-    try {
-      const dashboardWs = workbook.getWorksheet("Dashboard");
-      if (dashboardWs) {
-        const progressTable = dashboardWs.getTable("progress_bar");
-        if (progressTable) {
-          const progressRange = progressTable.getRangeBetweenHeaderAndTotal();
-          if (progressRange) {
-            const progressData = progressRange.getValues();
-
-            const headers = progressTable.getHeaderRowRange().getValues()[0];
-            const progressColIndex = headers.findIndex(h =>
-              String(h).toLowerCase().includes("progress")
-            );
-            const statusColIndex = headers.findIndex(h =>
-              String(h).toLowerCase().includes("status")
-            );
-
-            if (progressColIndex !== -1 && statusColIndex !== -1) {
-              for (let r = 0; r < progressData.length; r++) {
-                const progressValue = String(progressData[r][progressColIndex]).trim();
-                if (progressValue.toLowerCase().includes("subject list")) {
-                  const statusCell = progressRange.getCell(r, statusColIndex);
-                  statusCell.setValue("Done");
-                  statusCell.getFormat().getFill().setColor("#92D050");
-                  console.log(`Updated progress_bar: Subject List -> Done`);
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (progressError) {
-      const progressErrMsg = progressError instanceof Error ? progressError.message : JSON.stringify(progressError);
-      console.log("Warning: Could not update progress_bar table: " + progressErrMsg);
-    }
+    writeProgressStatus("subject list", "Done", "#92D050");
+    console.log(`Updated progress_bar: Subject List -> Done`);
 
     return {
       success: true,
@@ -263,6 +258,10 @@ function main(workbook: ExcelScript.Workbook, subjectData: object[], year: numbe
     if (errorDetails) {
       console.log("Error details: " + errorDetails);
     }
+
+    // Rule 2: write "Error" status so VBA poll loop detects failure immediately
+    // Rule 3: no rethrow — return cleanly
+    writeProgressStatus("subject list", "Error", "#FF0000");
 
     return {
       success: false,

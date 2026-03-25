@@ -12,6 +12,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.2.0] — 2026-03-25
+
+### Added
+
+- **`CheckWorkflowError()` in `Integration.bas`** — VBA poll loop now detects `"Error"` status written by Office Scripts, colours the Dashboard cell red, and exits the monitoring loop immediately without waiting for the 30-minute timeout
+- **`SubjectListErrored` / `TeachingStreamErrored` globals** — track per-workflow error state; if either is set, `RunAllMacros` is skipped and a `vbCritical` MsgBox is shown listing the failed workflows
+
+### Changed
+
+- **`subjectListParser.osts` and `teachingStreamParser.osts`** — `catch` blocks now write `"Error"` to the `progress_bar` status cell (via a new `writeProgressStatus` helper) before returning. Previously, script failures left the status stuck on `"Running..."` and caused silent 30-minute VBA timeouts
+- **`writeProgressStatus` helper** — shared progress-bar writer extracted into a reusable helper in both Office Scripts; success and error paths now use the same function
+- `MonitorAndExecute` exits as soon as both workflows are resolved (complete **or** errored) rather than only when both are complete
+
+---
+
 ## [1.1.0] — 2026-03-13
 
 ### Added

@@ -16,6 +16,8 @@
 Public StopMonitoring As Boolean
 Public OriginalCalculationMode As XlCalculation
 Public SilentMode As Boolean
+Public SubjectListErrored As Boolean
+Public TeachingStreamErrored As Boolean
 
 '===============================================================
 ' SECTION 1: ORCHESTRATION
@@ -143,6 +145,8 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
     refreshInterval = 15
     subjectListComplete = False
     teachingStreamComplete = False
+    SubjectListErrored = False
+    TeachingStreamErrored = False
     
     Application.StatusBar = "Monitoring workflows..."
     
@@ -165,24 +169,37 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
         DoEvents
         
         ' Check if Subject List workflow completed (cell F2)
-        If Not subjectListComplete And CheckWorkflowComplete(dashboardSheet, "F2") Then
-            subjectListComplete = True
-            Application.StatusBar = "Subject List Refresh completed!"
-            Debug.Print "Subject List Refresh Done"
-            Application.Wait (Now + TimeValue("0:00:01"))
+        If Not subjectListComplete And Not SubjectListErrored Then
+            If CheckWorkflowComplete(dashboardSheet, "F2") Then
+                subjectListComplete = True
+                Application.StatusBar = "Subject List Refresh completed!"
+                Debug.Print "Subject List Refresh Done"
+                Application.Wait (Now + TimeValue("0:00:01"))
+            ElseIf CheckWorkflowError(dashboardSheet, "F2") Then
+                SubjectListErrored = True
+                Application.StatusBar = "Subject List Refresh FAILED!"
+                Debug.Print "Subject List Refresh Error"
+            End If
         End If
         
         ' Check if Teaching Stream workflow completed (cell F5)
-        If Not teachingStreamComplete And CheckWorkflowComplete(dashboardSheet, "F5") Then
-            teachingStreamComplete = True
-            Application.StatusBar = "Teaching Stream Refresh completed!"
-            Debug.Print "Teaching Stream Refresh Done"
-            Application.Wait (Now + TimeValue("0:00:01"))
+        If Not teachingStreamComplete And Not TeachingStreamErrored Then
+            If CheckWorkflowComplete(dashboardSheet, "F5") Then
+                teachingStreamComplete = True
+                Application.StatusBar = "Teaching Stream Refresh completed!"
+                Debug.Print "Teaching Stream Refresh Done"
+                Application.Wait (Now + TimeValue("0:00:01"))
+            ElseIf CheckWorkflowError(dashboardSheet, "F5") Then
+                TeachingStreamErrored = True
+                Application.StatusBar = "Teaching Stream Refresh FAILED!"
+                Debug.Print "Teaching Stream Refresh Error"
+            End If
         End If
         
-        ' If both complete, exit monitoring loop
-        If subjectListComplete And teachingStreamComplete Then
-            Application.StatusBar = "Both workflows complete! Running macros..."
+        ' Exit if both workflows are resolved (complete or errored)
+        If (subjectListComplete Or SubjectListErrored) And _
+           (teachingStreamComplete Or TeachingStreamErrored) Then
+            Application.StatusBar = "Both workflows resolved. Evaluating results..."
             Exit Do
         End If
         
@@ -204,9 +221,12 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
     Application.StatusBar = False
     
     ' =========================================================================
-    ' POST-MONITORING — run macros or handle timeout/cancellation
+    ' POST-MONITORING — run macros or handle error/timeout/cancellation
     ' =========================================================================
-    If Not StopMonitoring And subjectListComplete And teachingStreamComplete Then
+    Dim anyErrored As Boolean
+    anyErrored = SubjectListErrored Or TeachingStreamErrored
+    
+    If Not StopMonitoring And Not anyErrored And subjectListComplete And teachingStreamComplete Then
         RunAllMacros dashboardSheet, emailValue
         FinaliseProcess dashboardSheet, emailValue
         
@@ -216,6 +236,15 @@ Sub MonitorAndExecute(dashboardSheet As Worksheet, emailValue As String)
                "- Assessment Data HTML Query" & vbCrLf & _
                "- Assessment Data Parsing" & vbCrLf & _
                "- Calculation Sheets Generation", vbInformation
+        
+    ElseIf anyErrored Then
+        ' Rule 4: one or both workflows reported "Error" — do not proceed with macros
+        Dim errMsg As String
+        errMsg = "One or more workflows encountered an error:" & vbCrLf
+        If SubjectListErrored Then errMsg = errMsg & vbCrLf & "  × Subject List Refresh"
+        If TeachingStreamErrored Then errMsg = errMsg & vbCrLf & "  × Teaching Stream Refresh"
+        errMsg = errMsg & vbCrLf & vbCrLf & "Check the Office Script run history in Power Automate for details."
+        MsgBox errMsg, vbCritical, "Workflow Error"
         
     ElseIf StopMonitoring Then
         MsgBox "Monitoring stopped by user.", vbInformation
@@ -288,6 +317,31 @@ Function CheckWorkflowComplete(dashboardSheet As Worksheet, cellAddress As Strin
         CheckWorkflowComplete = True
     Else
         CheckWorkflowComplete = False
+    End If
+End Function
+
+'---------------------------------------------------------------
+' CheckWorkflowError
+' Purpose: Rule 4 — detect when Office Script writes "Error" to
+'          a Dashboard status cell. Colours the cell red.
+' Called by: MonitorAndExecute
+' Returns: True if the workflow reported an error
+'---------------------------------------------------------------
+Function CheckWorkflowError(dashboardSheet As Worksheet, cellAddress As String) As Boolean
+    Dim cellValue As String
+    
+    DoEvents
+    cellValue = Trim(UCase(CStr(dashboardSheet.Range(cellAddress).Value)))
+    
+    If cellValue = "ERROR" Then
+        With dashboardSheet.Range(cellAddress)
+            .Interior.Color = RGB(255, 0, 0)  ' Red — matches SetProgress "Error" convention
+            .Font.Color = RGB(255, 255, 255)  ' White text for contrast
+        End With
+        DoEvents
+        CheckWorkflowError = True
+    Else
+        CheckWorkflowError = False
     End If
 End Function
 
