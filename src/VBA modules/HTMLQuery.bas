@@ -167,7 +167,7 @@ Sub GenerateSubjectQueries()
                 If Not dashboardSheet Is Nothing Then
                     With dashboardSheet.Range("F3")
                         .Value = "Skipped"
-                        .Interior.Color = RGB(191, 191, 191) 'Grey
+                        .Interior.Color = RGB(191, 191, 191) ' Grey
                     End With
                 End If
                 
@@ -239,7 +239,7 @@ Sub GenerateSubjectQueries()
             If Not dashboardSheet Is Nothing Then
                 With dashboardSheet.Range("F3")
                     .Value = "Skipped"
-                    .Interior.Color = RGB(191, 191, 191) 'Grey
+                    .Interior.Color = RGB(191, 191, 191) ' Grey
                 End With
                 DoEvents
             End If

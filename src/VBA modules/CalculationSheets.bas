@@ -1192,7 +1192,7 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
         Dim enrolPath As String
         enrolPath = "'" & ENROLMENT_TRACKER_BASE & "[" & enrolFile & "]Enrolment Number Tracker'!"
         
-        wsOutput.Cells(currentRow, 4).Formula = "=IFERROR(INDEX(" & enrolPath & "$I:$I,SUMPRODUCT((" & enrolPath & "$A:$A=B" & currentRow & ")*(" & enrolPath & "$C:$C=C" & currentRow & ")*ROW(" & enrolPath & "$A:$A))),0)"
+        wsOutput.Cells(currentRow, 4).Formula = "=IFERROR(INDEX(" & enrolPath & "$A:$IZ,SUMPRODUCT((" & enrolPath & "$A:$A=B" & currentRow & ")*(" & enrolPath & "$C:$C=C" & currentRow & ")*ROW(" & enrolPath & "$A:$A)),COUNTA(" & enrolPath & "$1:$1)),0)"
     End If
     
     ' Format header row
@@ -2004,7 +2004,7 @@ Sub FormatSheet(ws As Worksheet)
     markerBaseCol = Array(20, 30, 40)  ' T, AD, AN
     markerWidths = Array(30, 60, 7, 7, 7, 13, 13, 30, 30, 10)
     centerOffsets = Array(2, 3, 4, 5, 6, 9)
-    wrapOffsets = Array(1, 7, 8)
+    wrapOffsets = Array(1, 8)
     
     Dim m As Integer, baseCol As Integer, offset As Integer
     
