@@ -421,6 +421,14 @@ Function ExtractDescription(rowContent As String) As String
         If endPos > 0 Then
             description = Mid(rowContent, startPos, endPos - startPos)
             description = CleanHTMLContent(description)
+            
+            ' Add line break before hurdle requirement if it exists
+            If InStr(1, description, "hurdle requirement", vbTextCompare) > 0 Then
+                description = Replace(description, "hurdle requirement", Chr(10) & "Hurdle requirement", 1, -1, vbTextCompare)
+                description = Replace(description, " " & Chr(10), Chr(10))
+                description = Replace(description, Chr(10) & Chr(10), Chr(10))
+            End If
+            
             ExtractDescription = Trim(description)
         End If
     End If

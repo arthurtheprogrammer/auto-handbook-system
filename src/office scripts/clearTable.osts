@@ -1,0 +1,50 @@
+// =============================================================================
+// clearTable.osts
+// Purpose: Clear all data rows from any specified table. Used as a standalone
+//          step in Power Automate flows where the flow itself writes rows
+//          (e.g. handbook query assessment workflow uses AddRowV2 in a loop).
+// Author:  Arthur Chen
+// Repo:    github.com/arthurtheprogrammer/auto-handbook-system
+//
+// Usage:   Called by Power Automate "Run script" action with tableName parameter
+//          before a loop that appends rows via "Add a row into a table" action.
+// =============================================================================
+
+/**
+ * Clear all data rows from any specified table.
+ * 
+ * @param workbook - The Excel workbook
+ * @param tableName - The name of the table to clear
+ */
+function main(workbook: ExcelScript.Workbook, tableName: string) {
+
+    // Validate parameter
+    if (!tableName || tableName.trim() === "") {
+        console.log("Error: Table name parameter is required.");
+        return;
+    }
+
+    const table = workbook.getTable(tableName);
+
+    if (table) {
+        const rowCount = table.getRowCount();
+
+        if (rowCount > 0) {
+            table.deleteRowsAt(0, rowCount);
+            console.log(`${rowCount} data row(s) deleted from table '${tableName}'.`);
+        } else {
+            console.log(`Table '${tableName}' is already empty. No rows to delete.`);
+        }
+    } else {
+        console.log(`Table '${tableName}' not found. Skipping delete operation.`);
+
+        // List available tables for debugging
+        const allTables = workbook.getTables();
+        if (allTables.length > 0) {
+            console.log("Available tables in this workbook:");
+            allTables.forEach(t => console.log(`- ${t.getName()}`));
+        } else {
+            console.log("No tables found in this workbook.");
+        }
+    }
+}

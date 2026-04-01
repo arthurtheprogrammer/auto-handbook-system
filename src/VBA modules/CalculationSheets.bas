@@ -466,47 +466,31 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     ' ========================================================================
     ' STEP 3: Create and populate new workbook
     ' ========================================================================
+    
     Dim newWB As Workbook
-    Set newWB = Workbooks.add
-    LogMessage "Created new workbook"
-    
-    ' Clean up extra sheets
     Application.DisplayAlerts = False
-    On Error Resume Next
-    Do While newWB.Sheets.count > 1
-        newWB.Sheets(newWB.Sheets.count).Delete
-    Loop
-    Application.DisplayAlerts = True
-    On Error GoTo ErrorHandler
     
-    ' Copy calculation sheets
     If Not wsFHY Is Nothing Then
-        wsFHY.Copy Before:=newWB.Sheets(1)
-        LogMessage "Copied FHY Calculations"
-    End If
-    
-    If Not wsSHY Is Nothing Then
-        wsSHY.Copy After:=newWB.Sheets(newWB.Sheets.count)
-        LogMessage "Copied SHY Calculations"
-    End If
-    
-    ' Remove any blank sheets
-    Application.DisplayAlerts = False
-    On Error Resume Next
-    Dim i As Integer
-    For i = newWB.Sheets.count To 1 Step -1
-        If newWB.Sheets(i).name <> "FHY Calculations" And newWB.Sheets(i).name <> "SHY Calculations" Then
-            newWB.Sheets(i).Delete
+        wsFHY.Copy
+        Set newWB = ActiveWorkbook
+        LogMessage "Created new workbook and copied FHY Calculations"
+        
+        If Not wsSHY Is Nothing Then
+            wsSHY.Copy After:=newWB.Worksheets(newWB.Worksheets.count)
+            LogMessage "Copied SHY Calculations"
         End If
-    Next i
-    Application.DisplayAlerts = True
-    On Error GoTo ErrorHandler
-    
-    If newWB.Sheets.count = 0 Then
-        LogMessage "ERROR: No sheets in exported workbook"
-        newWB.Close SaveChanges:=False
+    ElseIf Not wsSHY Is Nothing Then
+        wsSHY.Copy
+        Set newWB = ActiveWorkbook
+        LogMessage "Created new workbook and copied SHY Calculations"
+    Else
+        LogMessage "ERROR: No calculation sheets to export"
+        Application.DisplayAlerts = True
         Exit Function
     End If
+    
+    Application.DisplayAlerts = True
+    On Error GoTo ErrorHandler
     
     ' Force recalculate exported sheets
     Dim ws As Worksheet
@@ -515,25 +499,22 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     Next ws
     
     ' ========================================================================
-    ' STEP 4: Copy VBA module FIRST (creates VBA project)
+    ' STEP 4: Determine save path and file format
     ' ========================================================================
-    LogMessage "Step 4: Checking for VBA module to copy..."
+    LogMessage "Step 4: Determining save format..."
     
     Dim hasVBA As Boolean
     hasVBA = False
     
-    If CopyVBAModuleIfExists(wb, newWB, "LecturerRefresh") Then
-        LogMessage "Step 4: SUCCESS - VBA module copied"
+    ' Check if VBA module exists in source to determine file format
+    On Error Resume Next
+    Dim sourceModule As Object
+    Set sourceModule = wb.VBProject.VBComponents("LecturerRefresh")
+    If Err.Number = 0 And Not sourceModule Is Nothing Then
         hasVBA = True
-        
-        Call AddRefreshButtonsToSheets(newWB)
-    Else
-        LogMessage "No VBA module found in source - will save as XLSX"
     End If
+    On Error GoTo ErrorHandler
     
-    ' ========================================================================
-    ' STEP 5: Determine save path
-    ' ========================================================================
     Dim savePath As String
     Dim folderPath As String
     
@@ -544,9 +525,17 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
         Exit Function
     End If
     
-    ' Add appropriate path separator (works on both platforms)
+    ' Fix any mixed slashes in folderPath if it's a URL
+    If InStr(folderPath, "http") > 0 Then
+        folderPath = Replace(folderPath, "\", "/")
+    End If
+    
     Dim pathSep As String
-    pathSep = Application.PathSeparator  ' Automatically "/" on Mac, "\" on Windows
+    If InStr(folderPath, "http") > 0 Or InStr(folderPath, "/") > 0 Then
+        pathSep = "/"
+    Else
+        pathSep = Application.PathSeparator
+    End If
     
     If Right(folderPath, 1) <> pathSep Then
         folderPath = folderPath & pathSep
@@ -570,12 +559,14 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     LogMessage "Target save path: " & savePath
     
     ' ========================================================================
-    ' STEP 6: Save directly to SharePoint
+    ' STEP 5: Save newly created workbook FIRST (to prevent corruption bug)
     ' ========================================================================
     LogMessage "Attempting to save..."
     
+    Application.DisplayAlerts = False
     On Error Resume Next
     newWB.SaveAs FileName:=savePath, fileFormat:=fileFormat
+    Application.DisplayAlerts = True
     
     If Err.Number <> 0 Then
         Dim saveErrNum As Long
@@ -584,36 +575,85 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
         saveErrDesc = Err.description
         
         LogMessage "ERROR: SaveAs failed - " & saveErrNum & " " & saveErrDesc
-        LogMessage "Failed path was: " & savePath
-        LogMessage "Attempting fallback to temp location..."
-        
-        ' Fallback to temp
-        Dim tempPath As String
-        tempPath = Application.DefaultFilePath
-        pathSep = Application.PathSeparator
-        
-        If Right(tempPath, 1) <> pathSep Then
-            tempPath = tempPath & pathSep
-        End If
-        
-        tempPath = tempPath & newFileName & fileExt
+        LogMessage "Prompting user to select a save location..."
         
         Err.Clear
-        newWB.SaveAs FileName:=tempPath, fileFormat:=fileFormat
         
-        If Err.Number = 0 Then
-            If Not SilentMode Then MsgBox "Could not save to SharePoint." & vbCrLf & vbCrLf & _
-                   "File saved to:" & vbCrLf & tempPath, vbInformation
-            savePath = tempPath
-            LogMessage "Saved to temp location: " & tempPath
+        Dim userSavePath As Variant
+        Dim filterStr As String
+        If hasVBA Then
+            filterStr = "Excel Macro-Enabled Workbook (*.xlsm), *.xlsm"
         Else
-            LogMessage "ERROR: Save failed completely - " & Err.Number & " " & Err.description
-            newWB.Close SaveChanges:=False
+            filterStr = "Excel Workbook (*.xlsx), *.xlsx"
+        End If
+        
+        Application.DisplayAlerts = False
+        userSavePath = Application.GetSaveAsFilename( _
+            InitialFileName:=newFileName & fileExt, _
+            FileFilter:=filterStr, _
+            Title:="Could not save to SharePoint. Please choose a location.")
+            
+        If userSavePath <> False Then
+            ' Guarantee the extension is appended if the user deleted it
+            Dim uPath As String
+            uPath = CStr(userSavePath)
+            Dim lastSlash As Long, lastDot As Long
+            lastSlash = InStrRev(uPath, "\")
+            lastDot = InStrRev(uPath, ".")
+            If lastDot < lastSlash Or lastDot = 0 Then
+                uPath = uPath & fileExt
+            End If
+            
+            On Error Resume Next
+            newWB.SaveAs FileName:=uPath, fileFormat:=fileFormat
+            
+            If Err.Number = 0 Then
+                If Not SilentMode Then MsgBox "File saved successfully to:" & vbCrLf & uPath, vbInformation
+                savePath = uPath
+                LogMessage "SUCCESS: Saved to user-selected location: " & savePath
+                Application.DisplayAlerts = True
+            Else
+                LogMessage "CRITICAL: User-selected save also failed - " & Err.description
+                If Not SilentMode Then MsgBox "Failed to save workbook." & vbCrLf & _
+                       "The exported file will remain open. Please save it manually.", vbCritical
+                Application.DisplayAlerts = True
+                Application.ScreenUpdating = True
+                Exit Function
+            End If
+        Else
+            LogMessage "WARNING: User cancelled save dialog."
+            If Not SilentMode Then MsgBox "Export workbook created but not saved." & vbCrLf & _
+                   "It is still open — save manually if needed.", vbInformation
+            Application.DisplayAlerts = True
             Application.ScreenUpdating = True
             Exit Function
         End If
     Else
-        LogMessage "SUCCESS: Saved to SharePoint"
+        LogMessage "SUCCESS: Saved to SharePoint: " & savePath
+    End If
+    
+    On Error GoTo ErrorHandler
+    
+    ' ========================================================================
+    ' STEP 6: Copy VBA module and add buttons
+    ' ========================================================================
+    If hasVBA Then
+        LogMessage "Step 6: Copying VBA module and adding buttons..."
+        If CopyVBAModuleIfExists(wb, newWB, "LecturerRefresh") Then
+            LogMessage "SUCCESS - VBA module copied"
+            Call AddRefreshButtonsToSheets(newWB)
+            ' Save again to commit VBA module and buttons
+            On Error Resume Next
+            newWB.Save
+            If Err.Number <> 0 Then
+                LogMessage "WARNING: Final save after adding VBA failed - " & Err.description
+            Else
+                LogMessage "SUCCESS: Final save completed"
+            End If
+            On Error GoTo ErrorHandler
+        Else
+            LogMessage "WARNING: Failed to copy VBA module"
+        End If
     End If
     
     On Error GoTo ErrorHandler

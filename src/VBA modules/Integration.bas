@@ -415,9 +415,9 @@ Sub SendCompletionNotification(dashboardSheet As Worksheet, emailValue As String
         
         With OutlookMail
             .To = emailValue
-            .subject = yearValue & " Marking & Admin Support Calculations Complete"
+            .subject = yearValue & "_M&M_Marking Admin Support Calculations Complete"
             .HTMLBody = "<p>Hello,</p>" & _
-                       "<p>" & yearValue & " Marking & Admin Support Calculations has been generated successfully!</p>" & _
+                       "<p>" & yearValue & "_M&M_Marking Admin Support Calculations has been generated successfully!</p>" & _
                        "<p>Please navigate to the <a href='https://unimelbcloud.sharepoint.com/:f:/r/teams/DepartmentofManagementMarketing-DepartmentOperations/Shared%20Documents/TEACHING%20SUPPORT/Handbook%20(Course%20%26%20Subject%20Changes)/Auto%20Handbook%20System?csf=1&web=1&e=kKYTrQ'>Auto Handbook System</a> folder on SharePoint to find the Excel spreadsheet.</p>" & _
                        "<p>Best regards,<br>Automated Handbook Data System</p>"
             .Send

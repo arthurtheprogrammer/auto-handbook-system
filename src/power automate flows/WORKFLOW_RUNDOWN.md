@@ -104,13 +104,13 @@ The `teachingStreamParser` Office Script updates the `progress_bar` table in the
 
 ---
 
-## Flow 3: Handbook Query Workflow
+## Flow 3: Handbook Query (Assessment) Workflow
 
 **File**: [handbook query (assessment).json](handbook%20query%20(assessment).json)
 
 **Visual Diagram**:
 
-![Handbook Query Workflow diagram](handbook%20query%20workflow.png)
+![Assessment Query Workflow diagram](assessment%20query%20workflow.png)
 
 **Trigger**: HTTP POST from `HTMLQuery.bas` (Mac only)
 
