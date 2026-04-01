@@ -253,7 +253,7 @@ These tables are populated automatically to build towards the final output sprea
 
 ## Understanding the Output (`Marking & Admin Support Calculations`)
 
-The system produces a file like: `[YEAR] Marking Admin Support Calculations.xlsm`
+The system produces a file like: `[YEAR]_M&M_Marking Admin Support Calculations.xlsm`
 
 This file contains two sheets:
 
@@ -297,11 +297,11 @@ Columns E–H & J are locked because they contain formulas referencing the `asse
 | --- | ------- | :-: | ----------- |
 | L | Lecturer/Instructors | ✏️ | Lecturer names — auto-populated from teaching stream data, refreshable via the Refresh button |
 | M | Status | ✏️ | Staff status (`Continuing T&R` highlighted to indicate eligibility for marking support) — auto-populated from staff data |
-| N | Stream # | ✏️ | **Hidden** Stream number |
+| N | Stream # | ✏️ | Stream number |
 | O | Activity Code | ✏️ | aggregated activity code from Allocate+ (e.g., `S01_01; S01_02`) |
 | P | Stream(s) Enrolment | ✏️ | **Manual Entry** - enrolment count per stream |
 | Q | Allocated Marking | 🔒 | **Formula** — `Stream # x 20 hrs/stream (default/benchmark set on Dashboard C10)` |
-| R | Marking Support Hours Available | 🔒 | **Formula** — `Total Marking Hours - Allocated Marking` |
+| R | Marking Support Hours Available | 🔒 | **Formula** — `Total Marking Hours for the subject * (Stream(s) Enrolment / Total Enrolment) - Allocated Marking` |
 | S | Lecturer Notes | ✏️ | Free-text notes about the lecturer/stream |
 
 #### Marker Blocks (T–AW) — 3 identical blocks of 10 columns each
@@ -359,7 +359,7 @@ When detected, word count and exam duration are set to `0` and the assessment qu
 After each successful run, **save a backup** of both files to preserve that semester's data:
 
 1. **The source workbook** — copy `Automated Handbook Data System.xlsm` and rename it (e.g., `Automated Handbook Data System - 2026 S1 backup.xlsm`)
-2. **The exported calculation file** — this is already a separate file (e.g., `2026 Marking Admin Support Calculations.xlsm`)
+2. **The exported calculation file** — this is already a separate file (e.g., `2026_M&M_Marking Admin Support Calculations.xlsm`)
 
 Store backups in the `backups` folder within the **Auto Handbook System** folder on SharePoint so the team can refer to previous years' outputs if needed.
 
@@ -373,7 +373,7 @@ The exported calculation file has a **Refresh** button in cell L2 on each sheet.
 
 ### How to Use
 
-1. Open the exported calculation file (e.g., `2026 Marking Admin Support Calculations.xlsm`)
+1. Open the exported calculation file (e.g., `2026_M&M_Marking Admin Support Calculations.xlsm`)
 2. Click the **Refresh** button in cell L2 on either sheet
 3. The system will:
    - Read the latest Teaching Matrix data

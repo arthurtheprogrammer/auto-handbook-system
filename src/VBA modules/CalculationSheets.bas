@@ -447,7 +447,7 @@ Function ExportCalculationSheets(wb As Workbook) As Boolean
     End If
     
     Dim newFileName As String
-    newFileName = CStr(yearValue) & " Marking Admin Support Calculations"
+    newFileName = CStr(yearValue) & "_M&M_Marking Admin Support Calculations"
     
     ' ========================================================================
     ' STEP 2: Find sheets
@@ -1199,6 +1199,22 @@ Function ProcessSubject(wb As Workbook, wsOutput As Worksheet, ByRef subject As 
     wsOutput.Rows(currentRow).Interior.Color = RGB(192, 192, 192)
     wsOutput.Cells(currentRow + assessmentRows - 1, 5).Font.Bold = True
     
+    ' Hyperlink subject code to handbook
+    Dim yearValueProcess As String
+    yearValueProcess = CStr(wb.Sheets("Dashboard").Range("C2").Value)
+    Dim handbookUrl As String
+    handbookUrl = "https://handbook.unimelb.edu.au/" & yearValueProcess & "/subjects/" & subjectCode & "/assessment"
+    
+    wsOutput.Hyperlinks.add Anchor:=wsOutput.Cells(currentRow, 2), _
+        Address:=handbookUrl, _
+        TextToDisplay:=subjectCode
+        
+    With wsOutput.Cells(currentRow, 2).Font
+        .Bold = True
+        .Color = RGB(0, 0, 0)
+        .Underline = xlUnderlineStyleNone
+    End With
+    
     ' Add assessment formulas
     Dim formulaRow As Long
     For i = 1 To assessments.count
@@ -1949,7 +1965,7 @@ Sub FormatSheet(ws As Worksheet)
     ' HIDDEN COLUMNS
     ' =================================================================
     Dim hideCols As Variant
-    hideCols = Array("A:A", "N:N")
+    hideCols = Array("A:A")
     
     For i = LBound(hideCols) To UBound(hideCols)
         ws.Columns(hideCols(i)).Hidden = True

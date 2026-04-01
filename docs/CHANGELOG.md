@@ -8,7 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-*No unreleased changes.*
+### Planned
+
+- **Timing Column** — Add a "Timing" column derived from the assessment data sheets to display when an assessment occurs (e.g., "Week 4") next to the "Assessment Details" column in both the base section and Marker Blocks. This will help markers manage their weekly marking capacities relative to their teaching arrangements.
+
+### Changed
+
+- **Stream # Column Visibility** — Unhid the "Stream #" (Column N) in generated calculation sheets so it is prominently visible to users.
+- **Handbook URL Generation** — Subject Codes in output sheets are now dynamically hyperlinked to their actual handbook pages for the current year (maintaining black, bolded text styling).
+- **Export Filenames** — Calculation workbook exports now follow the `[YEAR]_M&M_Marking Admin Support Calculations.xlsm` nomenclature.
 
 ---
 

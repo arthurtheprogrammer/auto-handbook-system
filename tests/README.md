@@ -18,7 +18,7 @@ If you have access to the department SharePoint, you can compare your output aga
 
 For each run, a backup should include:
 
-1. **Exported calculation file** — e.g., `2026 Marking Admin Support Calculations.xlsm`
+1. **Exported calculation file** — e.g., `2026_M&M_Marking Admin Support Calculations.xlsm`
 2. **Source workbook snapshot** — make a copy of `Automated Handbook Data System.xlsm`after run (contains all populated data tables). Include the year in the filename (e.g., `2026 Automated Handbook Data System.xlsm`) and move it to the `backups` folder
 
 ## How to Use for Verification
