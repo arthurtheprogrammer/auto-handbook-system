@@ -6,16 +6,44 @@ A guide for team members who manage the data sources and run the system. No codi
 
 ## Table of Contents
 
+- [⚠️ Important Notice — Handbook Data Download](#%EF%B8%8F-important-notice--handbook-data-download)
 - [How It Works (Simple Version)](#how-it-works-simple-version)
 - [Running the System](#running-the-system)
 - [What You Need to Maintain](#what-you-need-to-maintain)
 - [Data Source Reference](#data-source-reference)
 - [Dashboard Parameters](#dashboard-parameters)
 - [Understanding the Output](#understanding-the-output-marking--admin-support-calculations)
+- [Using the Marking Support Output](#using-the-marking-support-output)
 - [Backing Up](#backing-up)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
 - [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
+
+---
+
+## ⚠️ Important Notice — Handbook Data Download
+
+> [!WARNING]
+> **Temporary limitation (as of April 2026):** Handbook data can currently only be downloaded from a **Windows computer connected to the University VPN**.
+
+### What's happening?
+
+The system normally fetches assessment details from the University handbook website automatically. However, due to a university cybersecurity restriction, the cloud-based download method (Power Automate) is currently **unable to access the handbook website** directly.
+
+This means:
+
+- ✅ **Windows + VPN** — The system works normally using the built-in Power Query method. You must be connected to the university VPN.
+- ❌ **Mac** — The cloud-based fallback (Power Automate) is temporarily unavailable for handbook data. Mac users will need to arrange access to a Windows machine or use Remote Desktop.
+- ❌ **Windows without VPN** — The handbook website may not be reachable. Connect to the VPN first.
+
+### What do I need to do?
+
+1. **Connect to the University VPN** before running the system. If you haven't set up the VPN, follow the university's [VPN setup guide](https://uomservicehub.service-now.com/esc?id=kb_article&sysparm_article=KB0206807)
+2. **Run the system on a Windows computer** while connected to the VPN
+3. Everything else works the same — just follow the normal steps below
+
+> [!NOTE]
+> We are working with the university's cybersecurity team to resolve this. Once the restriction is lifted, the cloud-based method will be re-enabled and Mac users will be able to run the system as before. This notice will be removed when the issue is resolved.
 
 ---
 
@@ -348,6 +376,107 @@ To make changes to locked cells or add/remove rows, you need to **unprotect the 
 When detected, word count and exam duration are set to `0` and the assessment quantity formula adjusts accordingly. However, because handbook descriptions are not standardised, **the system cannot catch every case**. If an assessment was incorrectly classified (or missed), unprotect the sheet and manually adjust the Assessment Quantity (column I) or Marking Hours (column J) as needed.
 
 **Adding more rows** — If you need extra rows beyond what the system generated (e.g., for additional lecturers or notes), unprotect the sheet first, then insert rows as needed.
+
+---
+
+## Using the Marking Support Output
+
+This section walks you through how to actually **use** the generated calculation spreadsheet once it's been produced. Think of the output as a _starting point_ — the system auto-fills as much as it can from the handbook, but you'll need to review and adjust based on what each academic provides.
+
+### Step 1: Enter Stream Enrolments (Column P)
+
+For each **Teaching & Research (T&R) academic**, enter the **total number of students across all streams** they are teaching for that subject in the **Stream(s) Enrolment** column (P).
+
+For example, if an academic teaches Stream 1 (120 students) and Stream 2 (95 students), enter `215` in column P.
+
+This number is used to calculate how many marking hours are available to that lecturer.
+
+### Step 2: Understand the Marking Support Hours Calculation
+
+The **Marking Support Hours Available** (column R) tells you how many marking support hours a T&R academic can request. It is calculated as:
+
+```
+Marking Support Hours Available = Total Marking Hours × (Stream Enrolment / Total Enrolment) − Allocated Marking
+```
+
+Where:
+
+| Component | Column | Description |
+| --------- | ------ | ----------- |
+| **Total Marking Hours** | J (total row) | Sum of marking hours across all assessments for the subject, based on word count and exam benchmarks |
+| **Stream Enrolment** | P | The number you entered — total students across the academic's streams |
+| **Total Enrolment** | D | Live enrolment count pulled from the Enrolment Tracker |
+| **Allocated Marking** | Q | Baseline marking the academic is expected to cover themselves. Formula: `Number of Streams × 20 hrs/stream` (benchmark set on Dashboard C10) |
+
+In plain terms: the system works out the academic's **share** of the total marking (proportional to their students), then **subtracts** the marking they're already expected to do as part of their role.
+
+### Step 3: Verify Assessment Details Against the Academic's Information
+
+The assessment data (columns E–J) is **automatically parsed from the handbook website**. While the parsing is generally accurate, it can only predict so much from the handbook's language. **You should fact-check the assessment details for each subject** before processing.
+
+Common things to verify:
+
+- **Word counts** — Does the word count in column F match what the academic says?
+- **Group sizes** — Does the group size in column H match the academic's actual class setup?
+- **Exam details** — Is the exam flag (column G) correct?
+- **Assessment quantity** — Does the calculated quantity in column I make sense?
+
+> [!IMPORTANT]
+> **Check assessment details against what the academic is providing you.** Unexpected word counts or group sizes are the most common source of discrepancies in the final marking hours.
+
+### Step 4: Cross-Check with the Subject Coordinator's Guidelines
+
+The Subject Coordinator (SC) may have their own assessment marking guidelines. Be aware that:
+
+- The system typically uses the **minimum group size** from the handbook to calculate the **maximum marking hours available**
+- The SC's actual group sizes may be **larger or different** from the handbook minimum — in that case, the group assessment estimates will not match
+- If there's a mismatch, you'll need to correct it (see [Adjusting Assessment Details](#adjusting-assessment-details-columns-fh) below)
+
+### Adjusting Assessment Details (Columns F–H)
+
+If the assessment details don't match what the academic or SC has provided:
+
+1. **Unprotect the sheet**: Go to **Review** → **Unprotect Sheet** (no password needed)
+2. **Edit the relevant cells** in columns F (Word Count), G (Exam), or H (Group Size)
+3. Changes will automatically flow through to the **Assessment Quantity** (column I) and **Marking Hours** (column J)
+4. **Re-protect the sheet** when done: **Review** → **Protect Sheet** → **OK**
+
+### Step 5: Handle Special Cases
+
+Some assessments can't be fully captured by the auto-parsing and need manual attention:
+
+| Scenario | What to Do |
+| -------- | ---------- |
+| **Class participation with a written/marking component** | If there's a word-equivalent marking component (e.g., "500-word reflection per tutorial"), manually enter the word count in the relevant assessment row |
+| **Midterm exams or tests not captured** | Some midterms may not appear in the handbook data — manually add the word count or exam flag |
+| **Assessments excluded from or not captured with word count** | If the handbook description doesn't mention a word count but the assessment does require marking, manually enter the word count |
+| **Non-standard assessments** | For any assessment the parser didn't capture correctly, unprotect the sheet and adjust columns F–H as needed |
+
+### Step 6: Log and Verify Against University Benchmarks
+
+When the academic provides their own marking calculations:
+
+1. **Log their calculations** in an available **Marker Block** (columns T–AC, AD–AM, or AN–AW) — enter the academic's proposed arrangement in the Assessment Details and Quantity fields
+2. **Compare** their calculation against the system's output and the university's benchmarks (3,000 words/hr, 3 exams/hr, 20 hrs/stream)
+3. **Check compliance** — sometimes academics may miscalculate by not understanding the benchmarks correctly, or provide numbers that don't align with the uni's standards
+4. **The same applies for non-T&R staff** in special cases — enter their total stream enrolment and fill in the arrangement in an available Marker Block to verify compliance
+
+> [!TIP]
+> Using a Marker Block to log the academic's proposed arrangement alongside the system's calculation makes it easy to spot discrepancies and confirm compliance in one view.
+
+### Step 7: Account for Extra Marking Commitments
+
+If an academic indicates they are **willing to mark beyond their allocated marking hours**, make sure to adjust the baseline:
+
+- The default allocated marking is **20 hrs × number of streams** (column Q)
+- Add the **agreed extra marking hours** to this baseline
+- For example: if an academic has 2 streams and agrees to an extra 10 hours, the effective allocated marking is `(2 × 20) + 10 = 50 hours`
+- Unprotect the sheet, update the Allocated Marking value in column Q, and re-protect
+
+### ⚠️ Don't Leave Notes in Columns L–O
+
+> [!CAUTION]
+> **Do not put notes or comments in the Lecturer (L), Status (M), Stream # (N), or Activity Code (O) columns.** Running the **Lecturer Refresh** button will overwrite everything in columns L–O. Use the **Lecturer Notes** column (S) or **Assessment Notes** column (K) instead — these are preserved during a refresh.
 
 ---
 

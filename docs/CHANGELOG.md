@@ -18,6 +18,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 - **Handbook URL Generation** — Subject Codes in output sheets are now dynamically hyperlinked to their actual handbook pages for the current year (maintaining black, bolded text styling).
 - **Export Filenames** — Calculation workbook exports now follow the `[YEAR]_M&M_Marking Admin Support Calculations.xlsm` nomenclature.
 
+### Added
+
+- **"Using the Marking Support Output" guide (User Guide)** — Step-by-step walkthrough for using the generated calculation spreadsheet: entering stream enrolments, understanding the marking hours formula, verifying assessment details, handling special cases (class participation, midterms, missing word counts), logging academic calculations in Marker Blocks for compliance checks, and adjusting for extra marking commitments
+
+### Known Issues
+
+- **Handbook data scraping blocked from cloud (Power Automate)** — University cybersecurity blocks JavaScript rendering for requests from Microsoft Azure IPs, preventing the Power Automate Assessment Query Workflow from fetching handbook data. Awaiting cybersecurity team response on whitelisting Azure for `handbook.unimelb.edu.au`. Workaround: use Windows + university VPN (Power Query works locally). See [Developer Guide — Known Issues](docs/DEVELOPER_GUIDE.md#known-issues) for technical details
+
 ---
 
 ## [1.2.0] — 2026-03-25

@@ -13,6 +13,7 @@ Technical reference for maintaining and extending the Auto Handbook System.
 - [Key Cell References](#key-cell-references)
 - [Silent Mode](#silent-mode)
 - [Cross-Platform Notes](#cross-platform-notes)
+- [Known Issues](#known-issues)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -389,6 +390,32 @@ The system supports both **Mac** and **Windows**:
 - **Office Scripts write `"Error"` on failure** — the `catch` block in both `subjectListParser.osts` and `teachingStreamParser.osts` writes `"Error"` to the `progress_bar` status cell before returning. This allows the VBA poll loop to detect failures within the next 5-second tick rather than waiting for the 30-minute timeout
 - Path separators handled via `Application.PathSeparator`
 - `LecturerRefresh.bas` uses Mac-compatible 2D arrays instead of Collections for return types
+
+---
+
+## Known Issues
+
+### JavaScript Blocking on Power Automate HTTP Requests (April 2026)
+
+**Status:** Awaiting response from university cybersecurity team
+
+**Issue:** The university handbook website (`handbook.unimelb.edu.au`) serves its content via JavaScript-rendered pages. Power Automate's HTTP action (`Send an HTTP request`) receives the initial HTML shell but the assessment table content is not present because the JavaScript that populates the page is blocked by the university's cybersecurity infrastructure.
+
+This specifically affects:
+
+- **Flow 3 (Assessment Query Workflow)** — The Mac fallback flow that uses Power Automate HTTP requests to scrape handbook assessment pages. The HTTP response returns an empty or incomplete page because the JavaScript is not executed.
+- Microsoft Azure IP ranges (used by Power Automate) appear to be filtered or blocked by the university's web application firewall / security proxy.
+
+**What still works:**
+
+- **Power Query on Windows** — Power Query's `Web.Contents()` function executes from the local machine, so when connected to the university VPN, requests originate from a university-trusted IP range and the full page content (including JS-rendered assessment tables) is returned.
+- **Flows 1 & 2 (Subject List / Teaching Stream)** — These read from SharePoint Excel files via the Excel Online connector, not from the handbook website, so they are unaffected.
+
+**Root cause:** Power Automate HTTP requests originate from Microsoft Azure data centres. The university's cybersecurity infrastructure blocks or restricts JavaScript execution / full page rendering for requests coming from external cloud IP ranges. The handbook site likely uses a Cloudflare-style JavaScript challenge or similar bot-detection mechanism that Azure IPs fail.
+
+**Resolution path:** A request has been submitted to the university cybersecurity team to whitelist Microsoft Azure IP ranges for HTTP requests to `handbook.unimelb.edu.au`. If approved, Power Automate will be able to fetch handbook pages directly, restoring Mac compatibility.
+
+**Workaround:** Users must run the system on a **Windows machine connected to the university VPN**, which allows Power Query to fetch handbook data from a trusted IP. See [User Guide — Important Notice](USER_GUIDE.md#%EF%B8%8F-important-notice--handbook-data-download).
 
 ---
 
