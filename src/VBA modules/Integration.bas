@@ -289,17 +289,24 @@ End Sub
 
 '---------------------------------------------------------------
 ' StopCurrentOperation
-' Purpose: Signal the running macro pipeline to abort at the
-'          next step boundary. Cannot interrupt an in-flight
-'          synchronous HTTP call (PA workflow), but will halt
-'          before the next macro step (HTMLQuery, AssessmentData,
-'          or CalculationSheets) begins.
+' Purpose: Immediately terminate all running VBA execution.
+'          Restores application state before halting so Excel
+'          is not left in a broken state (frozen screen, manual calc).
 ' Called by: Dashboard Stop button
 '---------------------------------------------------------------
 Public Sub StopCurrentOperation()
     StopExecution = True
-    Application.StatusBar = "Stopping — will halt after current step completes..."
-    DoEvents
+    
+    ' Restore application state before hard-stopping
+    Application.ScreenUpdating = True
+    Application.Calculation = OriginalCalculationMode
+    Application.StatusBar = False
+    SilentMode = False
+    
+    MsgBox "Process stopped by user.", vbInformation, "Stopped"
+    
+    ' Hard stop — terminates all running VBA immediately
+    End
 End Sub
 
 '---------------------------------------------------------------
