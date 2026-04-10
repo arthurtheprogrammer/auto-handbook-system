@@ -40,19 +40,23 @@ Sub RefreshSubjectList()
     enrolmentTracker = GetOptionalValue(ws.Range("C3").Value)
     emailValue = GetOptionalValue(ws.Range("C12").Value)
     
-    ' Trigger the workflow
-    TriggerSubjectListWorkflow ws, yearValue, enrolmentTracker, emailValue
-    
-    MsgBox "Subject List Refresh workflow triggered successfully!", vbInformation
+    ' Trigger the workflow and show result
+    If TriggerSubjectListWorkflow(ws, yearValue, enrolmentTracker, emailValue) Then
+        MsgBox "Subject List Refresh completed successfully!", vbInformation
+    Else
+        MsgBox "Subject List Refresh failed. Check the status cell on the Dashboard.", vbCritical, "Workflow Error"
+    End If
 End Sub
 
 '---------------------------------------------------------------
 ' TriggerSubjectListWorkflow
-' Purpose: Build JSON payload and send HTTP POST to the
-'          subject list Power Automate endpoint
+' Purpose: Build JSON payload and send HTTP POST to the subject
+'          list Power Automate endpoint, then read the sync
+'          HTTP response to determine success or failure.
+' Returns: True if the flow reported success, False otherwise
 ' Called by: Integration.GenerateMarkingSupport, RefreshSubjectList
 '---------------------------------------------------------------
-Sub TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolmentTracker As String, emailValue As String)
+Function TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolmentTracker As String, emailValue As String) As Boolean
     Dim url As String
     Dim jsonData As String
     Dim result As String
@@ -74,4 +78,25 @@ Sub TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolmentTr
     #Else
         result = SendRequestWindows(url, jsonData)
     #End If
-End Sub
+    
+    ' Parse the synchronous HTTP response from the PA flow.
+    ' The flow returns a 200 with the Office Script body on success,
+    ' or a non-200 / "ERROR" sentinel on failure.
+    If result = "ERROR" Or result = "" Then
+        With ws.Range("F2")
+            .Value = "Error"
+            .Interior.Color = RGB(255, 0, 0)
+            .Font.Color = RGB(255, 255, 255)
+        End With
+        DoEvents
+        TriggerSubjectListWorkflow = False
+    Else
+        With ws.Range("F2")
+            .Value = "Complete"
+            .Interior.Color = RGB(146, 208, 80)
+            .Font.Color = RGB(0, 0, 0)
+        End With
+        DoEvents
+        TriggerSubjectListWorkflow = True
+    End If
+End Function

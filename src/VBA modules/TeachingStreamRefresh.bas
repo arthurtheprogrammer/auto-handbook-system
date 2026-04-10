@@ -40,19 +40,23 @@ Sub RefreshTeachingStream()
     teachingMatrix = GetOptionalValue(ws.Range("C5").Value)
     emailValue = GetOptionalValue(ws.Range("C12").Value)
     
-    ' Trigger the workflow
-    TriggerTeachingStreamWorkflow ws, yearValue, teachingMatrix, emailValue
-    
-    MsgBox "Teaching Stream Refresh workflow triggered successfully!", vbInformation
+    ' Trigger the workflow and show result
+    If TriggerTeachingStreamWorkflow(ws, yearValue, teachingMatrix, emailValue) Then
+        MsgBox "Teaching Stream Refresh completed successfully!", vbInformation
+    Else
+        MsgBox "Teaching Stream Refresh failed. Check the status cell on the Dashboard.", vbCritical, "Workflow Error"
+    End If
 End Sub
 
 '---------------------------------------------------------------
 ' TriggerTeachingStreamWorkflow
-' Purpose: Build JSON payload and send HTTP POST to the
-'          teaching stream Power Automate workflow
+' Purpose: Build JSON payload and send HTTP POST to the teaching
+'          stream Power Automate endpoint, then read the sync
+'          HTTP response to determine success or failure.
+' Returns: True if the flow reported success, False otherwise
 ' Called by: Integration.GenerateMarkingSupport, RefreshTeachingStream
 '---------------------------------------------------------------
-Sub TriggerTeachingStreamWorkflow(ws As Worksheet, yearValue As String, teachingMatrix As String, emailValue As String)
+Function TriggerTeachingStreamWorkflow(ws As Worksheet, yearValue As String, teachingMatrix As String, emailValue As String) As Boolean
     Dim url As String
     Dim jsonData As String
     Dim result As String
@@ -74,4 +78,25 @@ Sub TriggerTeachingStreamWorkflow(ws As Worksheet, yearValue As String, teaching
     #Else
         result = SendRequestWindows(url, jsonData)
     #End If
-End Sub
+    
+    ' Parse the synchronous HTTP response from the PA flow.
+    ' The flow returns a 200 with the Office Script body on success,
+    ' or a non-200 / "ERROR" sentinel on failure.
+    If result = "ERROR" Or result = "" Then
+        With ws.Range("F5")
+            .Value = "Error"
+            .Interior.Color = RGB(255, 0, 0)
+            .Font.Color = RGB(255, 255, 255)
+        End With
+        DoEvents
+        TriggerTeachingStreamWorkflow = False
+    Else
+        With ws.Range("F5")
+            .Value = "Complete"
+            .Interior.Color = RGB(146, 208, 80)
+            .Font.Color = RGB(0, 0, 0)
+        End With
+        DoEvents
+        TriggerTeachingStreamWorkflow = True
+    End If
+End Function
