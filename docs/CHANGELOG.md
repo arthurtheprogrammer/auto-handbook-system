@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
+## [1.3.0] — 2026-04-10
 
 ### Planned
 
@@ -14,17 +14,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
+- **Synchronous HTTP Response Parsing (`SubjectListRefresh.bas`, `TeachingStreamRefresh.bas`)** — Upgraded from polling arrays to synchronous blocking HTTP calls. The flows now return their payload directly in the HTTP 200 response body, which VBA parses (stripping JSON quotes and checking for exact `"ERROR:"` prefixes) for instant status evaluation, eliminating redundant SharePoint polling.
+- **HTML Query Execution (`HTMLQuery.bas`)** — Handled the 120-second API limit for synchronous Power Automate HTTP requests explicitly by preserving the dedicated 10-minute `F3` polling pattern on Mac, ensuring 5-minute workflows complete reliably without 504 Timeouts.
 - **Stream # Column Visibility** — Unhid the "Stream #" (Column N) in generated calculation sheets so it is prominently visible to users.
 - **Handbook URL Generation** — Subject Codes in output sheets are now dynamically hyperlinked to their actual handbook pages for the current year (maintaining black, bolded text styling).
 - **Export Filenames** — Calculation workbook exports now follow the `[YEAR]_M&M_Marking Admin Support Calculations.xlsm` nomenclature.
 
 ### Added
 
-- **"Using the Marking Support Output" guide (User Guide)** — Step-by-step walkthrough for using the generated calculation spreadsheet: entering stream enrolments, understanding the marking hours formula, verifying assessment details, handling special cases (class participation, midterms, missing word counts), logging academic calculations in Marker Blocks for compliance checks, and adjusting for extra marking commitments
-
-### Known Issues
-
-- **Handbook data scraping blocked from cloud (Power Automate)** — University cybersecurity blocks JavaScript rendering for requests from Microsoft Azure IPs, preventing the Power Automate Assessment Query Workflow from fetching handbook data. Awaiting cybersecurity team response on whitelisting Azure for `handbook.unimelb.edu.au`. Workaround: use Windows + university VPN (Power Query works locally). See [Developer Guide — Known Issues](docs/DEVELOPER_GUIDE.md#known-issues) for technical details
+- **`TestAsyncPowerAutomate.bas`** — Added a standalone test module demonstrating detached OS-level HTTP execution (`curl &` on Mac, `WScript.Shell` on Windows) for firing hundreds of simultaneous Power Automate queries without freezing Excel.
+- **"Using the Marking Support Output" guide (User Guide)** — Step-by-step walkthrough for using the generated calculation spreadsheet: entering stream enrolments, understanding the marking hours formula, verifying assessment details, handling special cases (class participation, midterms, missing word counts), logging academic calculations in Marker Blocks for compliance checks, and adjusting for extra marking commitments.
 
 ---
 
