@@ -15,6 +15,7 @@
 
 Public OriginalCalculationMode As XlCalculation
 Public SilentMode As Boolean
+Public StopExecution As Boolean
 
 '===============================================================
 ' SECTION 1: ORCHESTRATION
@@ -148,8 +149,19 @@ Sub GenerateMarkingSupport()
     ' =========================================================================
     ' STEP 3: Both workflows succeeded — run macros and finalise
     ' =========================================================================
+    StopExecution = False
     Application.StatusBar = "Both workflows complete. Running macros..."
     RunAllMacros dashboardSheet, emailValue
+    
+    If StopExecution Then
+        SilentMode = False
+        Application.Calculation = OriginalCalculationMode
+        Application.StatusBar = False
+        StopExecution = False
+        MsgBox "Process stopped by user.", vbInformation, "Stopped"
+        Exit Sub
+    End If
+    
     FinaliseProcess dashboardSheet, emailValue
     
     MsgBox "All processes finished!" & vbCrLf & vbCrLf & _
@@ -176,25 +188,30 @@ End Sub
 Sub RunAllMacros(dashboardSheet As Worksheet, emailValue As String)
     
     ' MACRO 1: GenerateSubjectQueries
+    Application.StatusBar = "Step 1/3: Generating subject queries..."
     On Error Resume Next
     GenerateSubjectQueries
     On Error GoTo 0
-    
     DoEvents
     
+    ' Check for user-requested stop between steps
+    If StopExecution Then Exit Sub
+    
     ' MACRO 2: ParseAssessmentData
+    Application.StatusBar = "Step 2/3: Parsing assessment data..."
     On Error Resume Next
     ParseAssessmentData
     On Error GoTo 0
-    
     DoEvents
     
+    If StopExecution Then Exit Sub
+    
     ' MACRO 3: GenerateCalculationSheets
+    Application.StatusBar = "Step 3/3: Generating calculation sheets..."
     On Error Resume Next
     GenerateCalculationSheets
     Application.Calculation = xlCalculationAutomatic
     On Error GoTo 0
-    
     DoEvents
 End Sub
 
@@ -262,11 +279,27 @@ Sub ResetStatus()
     Set dashboardSheet = ThisWorkbook.Sheets("Dashboard")
     
     ClearStatusColumn dashboardSheet
+    StopExecution = False
     SilentMode = False
     Application.StatusBar = False
     Application.Calculation = OriginalCalculationMode
     
     MsgBox "All status cells reset.", vbInformation
+End Sub
+
+'---------------------------------------------------------------
+' StopCurrentOperation
+' Purpose: Signal the running macro pipeline to abort at the
+'          next step boundary. Cannot interrupt an in-flight
+'          synchronous HTTP call (PA workflow), but will halt
+'          before the next macro step (HTMLQuery, AssessmentData,
+'          or CalculationSheets) begins.
+' Called by: Dashboard Stop button
+'---------------------------------------------------------------
+Public Sub StopCurrentOperation()
+    StopExecution = True
+    Application.StatusBar = "Stopping — will halt after current step completes..."
+    DoEvents
 End Sub
 
 '---------------------------------------------------------------
