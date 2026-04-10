@@ -159,15 +159,24 @@ Sub GenerateSubjectQueries()
             Dim triggerResult As String
             triggerResult = SendRequestMac(htmlWorkflowUrl, jsonPayload)
             
-            If triggerResult = "ERROR" Then
+            Dim resultLower As String
+            resultLower = LCase(triggerResult)
+            
+            Dim flowFailed As Boolean
+            ' If PA times out or script throws an error, we catch it here
+            flowFailed = (triggerResult = "ERROR" Or triggerResult = "" Or InStr(resultLower, "error") > 0)
+            
+            If flowFailed Then
                 Application.StatusBar = False
-                If Not SilentMode Then MsgBox "Failed to trigger HTML download workflow." & vbCrLf & vbCrLf & _
-                       "Check your network connection. Continuing with existing data.", vbExclamation, "Workflow Error"
+                If Not SilentMode Then MsgBox "Failed to complete HTML download workflow." & vbCrLf & vbCrLf & _
+                       "The Power Automate run either timed out (exceeded 2-3 minutes), failed, or returned an error." & vbCrLf & _
+                       "Continuing with existing data.", vbExclamation, "Workflow Error"
                 
                 If Not dashboardSheet Is Nothing Then
                     With dashboardSheet.Range("F3")
-                        .Value = "Skipped"
-                        .Interior.Color = RGB(191, 191, 191) ' Grey
+                        .Value = "Error"
+                        .Interior.Color = RGB(255, 0, 0) ' Red
+                        .Font.Color = RGB(255, 255, 255)
                     End With
                 End If
                 
@@ -175,65 +184,22 @@ Sub GenerateSubjectQueries()
                 Exit Sub
             End If
             
-            ' Poll F3 for "Done" (workflow writes this on completion)
-            Application.StatusBar = "Waiting for HTML download workflow to complete..."
-            Dim startTime As Double
-            Dim maxWaitSeconds As Long
-            maxWaitSeconds = 600  ' 10 minute timeout
-            startTime = Timer
+            ' =========================================================================
+            ' SUCCESS — The PA flow finished and returned its Response action
+            ' =========================================================================
+            Application.StatusBar = "Formatting table..."
+            Call FormatTableCleanup(htmlSheet, subjectsTable)
             
-            Do
-                DoEvents
-                Application.Wait (Now + TimeValue("0:00:05"))
-                
-                ' Force sync to pick up cloud changes
-                On Error Resume Next
-                wb.Save
-                On Error GoTo 0
-                
-                Dim f3Status As String
-                f3Status = UCase(Trim(CStr(dashboardSheet.Range("F3").Value)))
-                
-                If f3Status = "DONE" Or f3Status = "COMPLETE" Or f3Status = "FINISHED" Then
-                    Application.StatusBar = "Formatting table..."
-                    
-                    ' Silently format
-                    Call FormatTableCleanup(htmlSheet, subjectsTable)
-                    
-                    ' Update status to Complete
-                    If Not dashboardSheet Is Nothing Then
-                        With dashboardSheet.Range("F3")
-                            .Value = "Complete"
-                            .Interior.Color = RGB(146, 208, 80)
-                        End With
-                    End If
-                    
-                    Application.StatusBar = False
-                    Exit Sub
-                End If
-                
-                Dim elapsed As Double
-                elapsed = Timer - startTime
-                If elapsed < 0 Then elapsed = elapsed + 86400
-                Application.StatusBar = "Waiting for HTML download... (" & Format(elapsed, "0") & "s)"
-                
-                If elapsed > maxWaitSeconds Then
-                    Application.StatusBar = False
-                    If Not SilentMode Then MsgBox "HTML download workflow did not complete within 10 minutes." & vbCrLf & vbCrLf & _
-                           "The workflow may still be running in the background." & vbCrLf & _
-                           "Continuing with existing data.", vbExclamation, "Workflow Timeout"
-                    
-                    If Not dashboardSheet Is Nothing Then
-                        With dashboardSheet.Range("F3")
-                            .Value = "Timeout"
-                            .Interior.Color = RGB(255, 0, 0)
-                        End With
-                    End If
-                    
-                    Call FormatTableCleanup(htmlSheet, subjectsTable)
-                    Exit Sub
-                End If
-            Loop
+            If Not dashboardSheet Is Nothing Then
+                With dashboardSheet.Range("F3")
+                    .Value = "Complete"
+                    .Interior.Color = RGB(146, 208, 80)
+                    .Font.Color = RGB(0, 0, 0)
+                End With
+            End If
+            
+            Application.StatusBar = False
+            Exit Sub
         Else
             ' User chose to skip
             If Not dashboardSheet Is Nothing Then
