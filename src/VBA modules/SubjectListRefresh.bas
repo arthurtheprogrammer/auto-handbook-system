@@ -79,10 +79,19 @@ Function TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolm
         result = SendRequestWindows(url, jsonData)
     #End If
     
-    ' Parse the synchronous HTTP response from the PA flow.
-    ' The flow returns a 200 with the Office Script body on success,
-    ' or a non-200 / "ERROR" sentinel on failure.
-    If result = "ERROR" Or result = "" Then
+    ' Parse the synchronous HTTP response body from the PA flow.
+    ' Three failure cases:
+    '   1. curl/MSXML error          -> result = "ERROR"
+    '   2. empty response            -> result = ""
+    '   3. Office Script reported error inside the response body
+    '      (PA returns 200 even when the script throws, body contains "error")
+    Dim resultLower As String
+    resultLower = LCase(result)
+    
+    Dim flowFailed As Boolean
+    flowFailed = (result = "ERROR" Or result = "" Or InStr(resultLower, "error") > 0)
+    
+    If flowFailed Then
         With ws.Range("F2")
             .Value = "Error"
             .Interior.Color = RGB(255, 0, 0)
