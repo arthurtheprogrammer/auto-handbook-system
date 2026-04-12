@@ -109,23 +109,27 @@ Public Sub RefreshLecturerData()
     SetTeachingStreamRunningStatus
     
     ' STEP 2: Trigger Teaching Matrix workflow
-    Application.StatusBar = "Triggering Teaching Matrix workflow..."
+    Application.StatusBar = "Warning user about blocking request..."
+    
+    Application.ScreenUpdating = True
+    DoEvents
+    
+    MsgBox "Excel will now connect to the cloud to process latest lecturer data." & vbCrLf & vbCrLf & _
+           "Please note: Excel will appear frozen/unresponsive for 30–60 seconds while waiting for the server." & vbCrLf & vbCrLf & _
+           "Press OK to begin.", vbInformation, "Starting Refresh"
+           
+    Application.ScreenUpdating = False
+    Application.StatusBar = "Downloading new lecturer assignments... (Excel will freeze momentarily)"
     
     If Not TriggerTeachingMatrixWorkflow(yearValue, teachingMatrix, emailValue) Then
-        MsgBox "Failed to trigger Teaching Matrix workflow." & vbCrLf & vbCrLf & _
-               "Check your network connection and try again.", vbExclamation, "Workflow Error"
+        MsgBox "Failed to refresh Teaching Matrix data." & vbCrLf & vbCrLf & _
+               "The connection timed out or the server reported an error.", vbExclamation, "Workflow Error"
         GoTo CleanExit
     End If
     
-    MsgBox "Teaching Matrix workflow triggered successfully!" & vbCrLf & vbCrLf & _
-           "Please wait ~45 seconds for the cloud workflow to process the new data." & vbCrLf & vbCrLf & _
-           "You can track the progress in the Status Bar at the bottom left.", vbInformation, "Workflow Started"
-    
-    ' STEP 3: Wait for Teaching Matrix workflow completion
-    ' We now use a fixed 45-second wait to bypass Mac cache/sync delays.
-    WaitForTeachingMatrixWorkflowCompletion
-    
-    Application.StatusBar = "Workflow complete! Refreshing lecturer data..."
+    ' Give SharePoint 5 seconds to commit the file fully before we try to open it
+    Application.StatusBar = "Workflow complete! Opening server file..."
+    Application.Wait (Now + TimeValue("0:00:05"))
     
     ' STEP 4: Identify all subject blocks
     Application.StatusBar = "Identifying subject blocks..."
@@ -249,33 +253,21 @@ Private Function TriggerTeachingMatrixWorkflow(yearValue As String, teachingMatr
         result = SendRequestWindows(TEACHING_MATRIX_URL, jsonData)
     #End If
     
-    TriggerTeachingMatrixWorkflow = (result <> "ERROR")
+    ' Parse the synchronous HTTP response body from the PA flow.
+    Dim scriptResult As String
+    scriptResult = Trim(result)
+    If Left(scriptResult, 1) = Chr(34) And Right(scriptResult, 1) = Chr(34) Then
+        scriptResult = Mid(scriptResult, 2, Len(scriptResult) - 2)
+    End If
+    
+    Dim flowFailed As Boolean
+    flowFailed = (result = "ERROR" Or result = "" Or UCase(Left(scriptResult, 5)) = "ERROR")
+    
+    TriggerTeachingMatrixWorkflow = Not flowFailed
     Exit Function
     
 ErrorHandler:
     TriggerTeachingMatrixWorkflow = False
-End Function
-
-'---------------------------------------------------------------
-' WaitForTeachingMatrixWorkflowCompletion
-' Purpose: Wait 45 seconds for the Power Automate workflow to
-'          complete and SharePoint to sync the updated file.
-'          Polling is unreliable on Mac due to OneDrive caching.
-' Returns: True after wait completes
-'---------------------------------------------------------------
-Private Function WaitForTeachingMatrixWorkflowCompletion() As Boolean
-    Dim waitSeconds As Integer
-    waitSeconds = 45
-    
-    Dim i As Integer
-    For i = waitSeconds To 1 Step -1
-        Application.StatusBar = "Waiting for cloud workflow to process (" & i & "s remaining)..."
-        Application.Wait (Now + TimeValue("0:00:01"))
-        DoEvents
-    Next i
-    
-    Application.StatusBar = "Workflow wait complete. Fetching fresh data..."
-    WaitForTeachingMatrixWorkflowCompletion = True
 End Function
 
 '---------------------------------------------------------------
