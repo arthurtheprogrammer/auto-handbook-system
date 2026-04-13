@@ -109,17 +109,17 @@ Public Sub RefreshLecturerData()
     SetTeachingStreamRunningStatus
     
     ' STEP 2: Trigger Teaching Matrix workflow
-    Application.StatusBar = "Warning user about blocking request..."
+    Application.StatusBar = "Triggering Teaching Matrix workflow..."
     
     Application.ScreenUpdating = True
     DoEvents
     
-    MsgBox "Excel will now connect to the cloud to process latest lecturer data." & vbCrLf & vbCrLf & _
-           "Please note: Excel will appear frozen/unresponsive for 30–60 seconds while waiting for the server." & vbCrLf & vbCrLf & _
+    MsgBox "Excel will now connect to the Enrolment Tracker to fetch latest lecturer data." & vbCrLf & vbCrLf & _
+           "Please note: Excel will appear frozen/unresponsive for 30–60 seconds while waiting for the workflow to complete." & vbCrLf & vbCrLf & _
            "Press OK to begin.", vbInformation, "Starting Refresh"
            
     Application.ScreenUpdating = False
-    Application.StatusBar = "Downloading new lecturer assignments... (Excel will freeze momentarily)"
+    Application.StatusBar = "Refreshing lecturer assignments... (Excel will freeze momentarily)"
     
     If Not TriggerTeachingMatrixWorkflow(yearValue, teachingMatrix, emailValue) Then
         MsgBox "Failed to refresh Teaching Matrix data." & vbCrLf & vbCrLf & _
@@ -162,7 +162,7 @@ Public Sub RefreshLecturerData()
     updateCount = UpdateAllLecturers(wb, teachingData, subjectBlocks)
     
 CleanExit:
-    Application.Calculation = origCalculation
+    Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = origScreenUpdating
     Application.EnableEvents = origEnableEvents
     Application.StatusBar = False
@@ -176,7 +176,7 @@ CleanExit:
     Exit Sub
     
 ErrorHandler:
-    Application.Calculation = origCalculation
+    Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = origScreenUpdating
     Application.EnableEvents = origEnableEvents
     Application.StatusBar = False
