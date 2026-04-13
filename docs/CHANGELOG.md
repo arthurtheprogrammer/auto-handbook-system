@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.3.1] — 2026-04-13
+
+### Fixed
+
+- **Lecturer Refresh Logic** — Refactored `LecturerRefresh.bas` (the macro embedded in exported calculation sheets) to correctly consume the synchronous Power Automate workflow. Replaced the redundant 45-second polling delay with a pre-execution blocking warning dialog, and implemented Office Script `ERROR:` prefix evaluation on the synchronous HTTP response payload.
+
+---
+
 ## [1.3.0] — 2026-04-10
 
 ### Planned
