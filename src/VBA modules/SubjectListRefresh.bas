@@ -79,7 +79,7 @@ Function TriggerSubjectListWorkflow(ws As Worksheet, yearValue As String, enrolm
         result = SendRequestWindows(url, jsonData)
     #End If
     
-    ' Parse the synchronous HTTP response body from the PA flow using the tracker-system pattern
+    ' Parse the synchronous HTTP response body from the PA flow.
     Dim scriptResult As String
     scriptResult = Trim(result)
     If Left(scriptResult, 1) = Chr(34) And Right(scriptResult, 1) = Chr(34) Then

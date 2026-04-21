@@ -114,7 +114,7 @@ Public Sub RefreshLecturerData()
     Application.ScreenUpdating = True
     DoEvents
     
-    MsgBox "Excel will now connect to the Enrolment Tracker to fetch latest lecturer data." & vbCrLf & vbCrLf & _
+    MsgBox "Excel will now connect to the Teaching Matrix to fetch latest lecturer data." & vbCrLf & vbCrLf & _
            "Please note: Excel will appear frozen/unresponsive for 30–60 seconds while waiting for the workflow to complete." & vbCrLf & vbCrLf & _
            "Press OK to begin.", vbInformation, "Starting Refresh"
            
