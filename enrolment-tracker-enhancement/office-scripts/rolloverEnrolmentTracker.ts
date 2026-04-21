@@ -13,10 +13,14 @@
 //   4. Shifts historical enrol columns (keeps only ±2 years from newYear):
 //      - Deletes the oldest year column (newYear - 3)
 //      - Renames "[prevYear] Enrol"        → "[newYear-1] Enrol"  (already correct, from copy)
+//      - Hard-copies "[prevYear] Enrol" values (strips formulas) so data survives the date-column clear
 //      - Sets "[newYear] Enrol" column to the LET formula (pulls from Enrolment_Number)
+//        · Returns blank when Enrolment_Number has no date columns (table shorter than col D)
 //      - Adds a new empty "[newYear+2] Enrol Est" column
 //      - Deletes the now-stale "[prevYear+2] Enrol Est" which is now +3 years out
-//   5. Clears all date columns (after Study Period) in Enrolment_Number and Prediction_Tool tables
+//   5. Updates the date-indicator row (row above the table header) for formula columns:
+//      · Shows the last date column header from the source table, or "no data" when table has no date columns
+//   6. Clears all date columns (after Study Period) in Enrolment_Number and Prediction_Tool tables
 
 function main(workbook: ExcelScript.Workbook) {
   // ── 1. Prompt for new year ────────────────────────────────────────────────
@@ -103,7 +107,32 @@ function main(workbook: ExcelScript.Workbook) {
   //     (If the column is still named "[prevYear] Enrol" from last year's rollover, rename it)
   //     Note: after archiving, the user's copy will already have prev year labelled correctly.
 
-  // 4d. Set [newYear] Enrol column to the LET formula
+  // 4c.5. Hard-copy [prevYear] Enrol values before the date columns are cleared.
+  //       The [prevYear] Enrol column was seeded with the LET formula during the previous
+  //       rollover and currently references Enrolment_Number date columns.  Capturing its
+  //       computed values now ensures the historical data survives step 5 (date-column clear).
+  try {
+    const prevEnrolCol = trackerTable.getColumnByName(`${prevYear} Enrol`);
+    if (prevEnrolCol) {
+      const prevEnrolRange = prevEnrolCol.getRangeBetweenHeaderAndTotal();
+      const prevEnrolValues = prevEnrolRange.getValues();
+      prevEnrolRange.setValues(prevEnrolValues); // writes back as hard values, strips any formula
+      console.log(`✓ Hard copied ${prevYear} Enrol values (formulas stripped)`);
+    } else {
+      console.log(`Warning: "${prevYear} Enrol" column not found — skipping hard copy.`);
+    }
+  } catch {
+    console.log(`Warning: Could not hard copy "${prevYear} Enrol" values.`);
+  }
+
+  // 4d. Set [newYear] Enrol column to the LET formula.
+  //     The formula returns blank ("") when:
+  //       • No matching row is found in Enrolment_Number (IFERROR catches the MATCH failure)
+  //       • The result is 0 or empty
+  //       • The result is non-numeric — which happens when Enrolment_Number has no date
+  //         columns yet (table shorter than col D) and INDEX falls back to the Study Period
+  //         column, returning a text string.  NOT(ISNUMBER(result)) catches this case and
+  //         returns blank instead of surfacing the text or a downstream VALUE error.
   const newYearEnrolCol = findColumnIndex(trackerTable, `${newYear} Enrol`);
   if (newYearEnrolCol !== -1) {
     const dataRange = trackerTable.getColumnByName(`${newYear} Enrol`).getRangeBetweenHeaderAndTotal();
@@ -111,7 +140,8 @@ function main(workbook: ExcelScript.Workbook) {
     const formula =
       `=LET(result, IFERROR(INDEX(Enrolment_Number[#All], ` +
       `MATCH([@[Subject Code]]&[@[Study Period]], Enrolment_Number[Subject Code]&Enrolment_Number[Study Period], 0) + 1, ` +
-      `COLUMNS(Enrolment_Number[#Data])), ""), IF(OR(result="", result=0), "", result))`;
+      `COLUMNS(Enrolment_Number[#Data])), ""), ` +
+      `IF(OR(result="", result=0, NOT(ISNUMBER(result))), "", result))`;
 
     for (let r = 0; r < rowCount; r++) {
       dataRange.getCell(r, 0).setFormula(formula);
@@ -138,7 +168,15 @@ function main(workbook: ExcelScript.Workbook) {
   //     e.g. for rollover to 2027: delete "2026 Enrol Est" (now redundant, replaced by actual 2026 Enrol data)
   deleteTableColumn(trackerTable, `${prevYear} Enrol Est`);
 
-  // ── 5. Clear date columns in Enrolment_Number and Prediction_Tool ─────────
+  // ── 5. Update date-indicator row for formula columns ──────────────────────
+  // Many deployments have a "date row" immediately above the table header row where
+  // each formula column shows the as-of date of its source data.  After the date columns
+  // are cleared in step 6 that indicator would otherwise show an error; update it now
+  // so it shows the last date column header from the source table, or "no data" when the
+  // table has no date columns (i.e. is shorter than col D / Study Period).
+  updateDateIndicatorRow(trackerTable, `${newYear} Enrol`, "Enrolment_Number");
+
+  // ── 6. Clear date columns in Enrolment_Number and Prediction_Tool ─────────
   clearDateColumns(workbook, "Enrolment_Number");
   clearDateColumns(workbook, "Prediction_Tool");
 
@@ -148,6 +186,8 @@ function main(workbook: ExcelScript.Workbook) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const STUDY_PERIOD_COL = "Study Period";
 
 function findTable(workbook: ExcelScript.Workbook, tableName: string): ExcelScript.Table | undefined {
   for (const ws of workbook.getWorksheets()) {
@@ -202,10 +242,10 @@ function clearDateColumns(workbook: ExcelScript.Workbook, tableName: string) {
   }
 
   const headers = table.getHeaderRowRange().getValues()[0] as string[];
-  const studyPeriodIdx = headers.indexOf("Study Period");
+  const studyPeriodIdx = headers.indexOf(STUDY_PERIOD_COL);
 
   if (studyPeriodIdx === -1) {
-    console.log(`Warning: "Study Period" column not found in ${tableName} — skipping clear.`);
+    console.log(`Warning: "${STUDY_PERIOD_COL}" column not found in ${tableName} — skipping clear.`);
     return;
   }
 
@@ -219,4 +259,52 @@ function clearDateColumns(workbook: ExcelScript.Workbook, tableName: string) {
     }
   }
   console.log(`✓ Cleared all date columns from "${tableName}" (kept up to Study Period)`);
+}
+
+/**
+ * Looks for a "date indicator" row immediately above the table header row for the
+ * given column and writes a formula that shows:
+ *   • The last date-column header from sourceTableName  (when date columns exist), or
+ *   • "no data"                                         (when the table is shorter than col D,
+ *                                                        i.e. has no date columns beyond Study Period)
+ *
+ * This prevents VALUE errors and the misleading Study Period text that appear when
+ * the source table has been cleared and INDEX falls back to a non-numeric column.
+ *
+ * If no row exists above the table header (the table starts at sheet row 1) the
+ * function skips silently so existing layouts are never broken.
+ */
+function updateDateIndicatorRow(
+  table: ExcelScript.Table,
+  columnName: string,
+  sourceTableName: string
+) {
+  try {
+    const col = table.getColumnByName(columnName);
+    if (!col) {
+      console.log(`Warning: Column "${columnName}" not found — skipping date indicator update.`);
+      return;
+    }
+
+    // Get the header cell for this column then step one row up into the sheet.
+    const colIndex = col.getIndex();
+    const headerCell = table.getHeaderRowRange().getCell(0, colIndex);
+    const dateIndicatorCell = headerCell.getOffsetRange(-1, 0);
+
+    // If the offset lands outside the sheet (row < 0) Excel will throw; catch it.
+    const dateFormula =
+      `=IFERROR(` +
+        `IF(` +
+          `COLUMNS(${sourceTableName}[#Data])<=MATCH("${STUDY_PERIOD_COL}",${sourceTableName}[#Headers],0),` +
+          `"no data",` +
+          `INDEX(${sourceTableName}[#Headers],1,COLUMNS(${sourceTableName}[#Data]))` +
+        `),` +
+        `"no data"` +
+      `)`;
+
+    dateIndicatorCell.setFormula(dateFormula);
+    console.log(`✓ Updated date indicator row for "${columnName}" (shows last date or "no data")`);
+  } catch {
+    console.log(`Info: No date indicator row found above "${columnName}" header — skipping.`);
+  }
 }
