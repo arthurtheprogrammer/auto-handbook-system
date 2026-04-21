@@ -165,6 +165,7 @@ CleanExit:
     Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = origScreenUpdating
     Application.EnableEvents = origEnableEvents
+    DoEvents
     Application.StatusBar = False
     
     If updateCount > 0 Then
@@ -179,6 +180,7 @@ ErrorHandler:
     Application.Calculation = xlCalculationAutomatic
     Application.ScreenUpdating = origScreenUpdating
     Application.EnableEvents = origEnableEvents
+    DoEvents
     Application.StatusBar = False
     
     MsgBox "Error refreshing lecturer data:" & vbCrLf & vbCrLf & _
