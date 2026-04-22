@@ -14,6 +14,7 @@ Technical reference for maintaining and extending the Auto Handbook System.
 - [Silent Mode](#silent-mode)
 - [Cross-Platform Notes](#cross-platform-notes)
 - [Known Issues](#known-issues)
+- [System Handover / Ownership Transfer](#system-handover--ownership-transfer)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -416,6 +417,83 @@ This specifically affects:
 **Resolution path:** A request has been submitted to the university cybersecurity team to whitelist Microsoft Azure IP ranges for HTTP requests to `handbook.unimelb.edu.au`. If approved, Power Automate will be able to fetch handbook pages directly, restoring Mac compatibility.
 
 **Workaround:** Users must run the system on a **Windows machine connected to the university VPN**, which allows Power Query to fetch handbook data from a trusted IP. See [User Guide — Important Notice](USER_GUIDE.md#%EF%B8%8F-important-notice--handbook-data-download).
+
+---
+
+## System Handover / Ownership Transfer
+
+When the system needs to be transferred to a new owner (e.g. staff change), the Power Automate flows must be re-connected under the new owner's credentials. The HTTP trigger URLs and VBA modules **do not need to change** — only the internal connections need to be updated.
+
+> **Why this is needed:** Power Automate connections are always tied to a personal account. Even when flows are published as a solution, the Excel Online / SharePoint / Teams actions run as whoever authenticated the connection. If that person leaves, the flows will break when their credentials expire.
+
+### Pre-requisites
+
+1. **New owner has access** to the SharePoint sites where the Excel files live (Enrolment Tracker, Teaching Matrix, and the main `.xlsm` workbook).
+2. **New owner is a co-owner of the solution** — in Power Automate, open the solution → **Share** → add the new owner. This also grants the necessary Dataverse `ReadAccess` on the Connection Reference records.
+3. **Both parties are in the same Power Automate environment** — verify via the environment switcher (top-right corner of `make.powerautomate.com`).
+
+### Step 1 — Copy Office Scripts to New Owner's OneDrive
+
+Because Power Automate's "Run Script" action enumerates scripts under the authenticated connection's credentials, the new owner must have their own copy of each Office Script.
+
+1. Open each `.osts` file from this repo (under `src/office scripts/`).
+2. Paste the code into a new Office Script saved to the **new owner's OneDrive** via Excel Online → **Automate → New Script**.
+3. Save each script with the **same name** as the original for clarity.
+
+Scripts to copy:
+
+| Script File | Used By |
+| ----------- | ------- |
+| `subjectListParser.osts` | Flow 1 — Subject List Refresh |
+| `teachingStreamParser.osts` | Flow 2 — Teaching Stream Refresh |
+| Any inline script in Flow 3 | Flow 3 — Assessment Query Workflow (Mac fallback) |
+
+### Step 2 — Create Connections in Power Automate
+
+The new owner must create their own connections for each connector type used by the flows:
+
+1. In Power Automate → **Data → Connections → New connection**
+2. Create connections for: **Excel Online (Business)**, **SharePoint**, **Office 365 Outlook** (if used), **Microsoft Teams** (if used).
+3. Authenticate each connection with the new owner's university account.
+
+### Step 3 — Update the Solution Connection Reference
+
+Because the flows are published as a solution, connections are managed at the solution level via **Dataverse Connection References** — updating here applies to all flows at once.
+
+1. Open the solution in Power Automate → find the **Connection References** section.
+2. Switch the Excel Online (Business) connection reference from the old owner's connection to the new owner's newly created connection.
+3. Repeat for SharePoint and any other connectors listed.
+4. Save the solution.
+
+> **Note:** If the new owner sees a Dataverse `ReadAccess` error on the Connection Reference record, it means they are not yet a solution co-owner. Complete the co-owner step in Pre-requisites first.
+
+### Step 4 — Remap "Run Script" Actions
+
+After the connection reference is updated, each "Run Script" action in the flows must be re-pointed to the new owner's copy of the script:
+
+1. Open each flow that contains a **"Run Script"** action.
+2. **Before changing anything**, note down the current script name and all parameter values (take a screenshot of the action as a reference).
+3. Switch the connection to the new owner's connection.
+4. The **Script** dropdown will go blank — this is expected. Click the dropdown and re-select the equivalent script from the new owner's OneDrive.
+5. Re-enter all parameters exactly as they were (refer to the screenshot taken in step 2).
+6. Save the flow.
+
+### Step 5 — Verify
+
+1. Manually trigger each flow from Power Automate and confirm it runs successfully end-to-end.
+2. The first 1–3 runs after a connection switch may be slower than usual (3–5 minutes) due to connection warm-up / OAuth token caching. This is expected and resolves after a few runs.
+3. Confirm the Dashboard status cells (`F2`, `F5`) update to `"Done"` after the flows complete.
+4. Run the full integrated process (`GenerateMarkingSupport`) and verify the output.
+
+### What Does NOT Change
+
+| Item | Changes? | Notes |
+| ---- | -------- | ----- |
+| HTTP trigger URLs | ❌ No | Tied to flow ID, not the connection owner |
+| VBA module URLs (`SubjectListRefresh.bas`, etc.) | ❌ No | No updates needed |
+| SharePoint file paths | ❌ No | Flows still point to the same files |
+| Office Script logic | ❌ No | Only the copy location changes (new owner's OneDrive) |
+| `progress_bar` status signals | ❌ No | Script behaviour is identical |
 
 ---
 
