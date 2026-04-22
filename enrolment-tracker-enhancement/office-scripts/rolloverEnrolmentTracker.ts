@@ -168,16 +168,25 @@ function main(workbook: ExcelScript.Workbook) {
     const srcEstCol = trackerTable.getColumnByName(`${newYear + 1} Enrol Est`);
     const dstEstCol = trackerTable.getColumnByName(`${futureYear} Enrol Est`);
     if (srcEstCol && dstEstCol) {
-      const srcRange = srcEstCol.getRange();
-      const dstRange = dstEstCol.getRange();
-      dstRange.copyFrom(srcRange, ExcelScript.RangeCopyType.formats);
-      dstRange.getFormat().setColumnWidth(srcRange.getFormat().getColumnWidth());
+      // copyFrom on freshly-added table columns is unreliable — copy properties manually
+      // from the first data cell of the source column.
+      const srcCell = srcEstCol.getRangeBetweenHeaderAndTotal().getCell(0, 0);
+      const dstData = dstEstCol.getRangeBetweenHeaderAndTotal();
+      dstData.setNumberFormat(srcCell.getNumberFormat());
+      const srcFont = srcCell.getFormat().getFont();
+      const dstFont = dstData.getFormat().getFont();
+      dstFont.setColor(srcFont.getColor());
+      dstFont.setBold(srcFont.getBold());
+      dstFont.setItalic(srcFont.getItalic());
+      dstFont.setSize(srcFont.getSize());
+      try { dstData.getFormat().getFill().setColor(srcCell.getFormat().getFill().getColor()); } catch { /* transparent fill — skip */ }
+      dstEstCol.getRange().getFormat().setColumnWidth(srcEstCol.getRange().getFormat().getColumnWidth());
       console.log(`✓ Format painted from "${newYear + 1} Enrol Est" to "${futureYear} Enrol Est"`);
     } else {
       console.log(`Warning: Could not find Est column(s) for format copy.`);
     }
   } catch (e) {
-    console.log(`Warning: Could not copy format to "${futureYear} Enrol Est": ${e}`);
+    console.log(`Warning: Could not copy format to "${futureYear} Enrol Est": ${(e as Error).message ?? e}`);
   }
 
   // 4f. Delete the now-stale future-3 Enrol Est column (was newYear+2 before rollover = prevYear+2)
@@ -220,21 +229,21 @@ function main(workbook: ExcelScript.Workbook) {
   // 4i. Set row text colour to red for: Subject Coordinator, any "Notes" column,
   //     and TE / A+ Configuration (case-insensitive match; skip if not found).
   const redColHeaders = trackerTable.getHeaderRowRange().getValues()[0] as string[];
-  for (let i = 0; i < redColHeaders.length; i++) {
-    const h = String(redColHeaders[i]).toLowerCase().trim();
+  for (const hdr of redColHeaders) {
+    const h = String(hdr).toLowerCase().trim();
     const isTarget =
       h === "subject coordinator" ||
       h.includes("notes") ||
-      h === "te / a+ configuration";
-    if (isTarget) {
-      try {
-        trackerTable.getColumnByIndex(i)
-          .getRangeBetweenHeaderAndTotal()
-          .getFormat().getFont().setColor("#FF0000");
-        console.log(`✓ Set red font on "${redColHeaders[i]}"`);
-      } catch {
-        // column exists in header but range inaccessible — skip
+      h.startsWith("te / a+ configuration");
+    if (!isTarget) continue;
+    try {
+      const col = trackerTable.getColumnByName(String(hdr));
+      if (col) {
+        col.getRangeBetweenHeaderAndTotal().getFormat().getFont().setColor("#FF0000");
+        console.log(`✓ Set red font on "${hdr}"`);
       }
+    } catch {
+      // not found or inaccessible — skip
     }
   }
 
