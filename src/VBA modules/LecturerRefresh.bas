@@ -99,7 +99,7 @@ Public Sub RefreshLecturerData()
     
     If Not GetSourceParameters(yearValue, teachingMatrix, emailValue) Then
         MsgBox "Could not read parameters from the source file." & vbCrLf & vbCrLf & _
-               "Before clicking Refresh, please open the master file manually:" & vbCrLf & _
+               "Before clicking Refresh, please open the source file manually:" & vbCrLf & _
                "  Automated Handbook Data System.xlsm" & vbCrLf & vbCrLf & _
                "You can find it on SharePoint at:" & vbCrLf & SOURCE_FILE_PATH & vbCrLf & vbCrLf & _
                "Once it is open, click Refresh again.", vbExclamation, "Source File Not Found"

@@ -3,7 +3,7 @@
 // Invoked via a button on the Instructions sheet.
 //
 // What it does:
-//   1. Prompts user for the new upcoming year (e.g. 2027)
+//   1. Reads current year from YEAR PLANNING!B1 (merged-cell-safe); newYear = current + 1
 //   2. Updates YEAR PLANNING sheet cell B1 with the new year
 //   3. Renames year-labelled columns in Enrolment_Tracker table:
 //      - "[prevYear] Current Enrol"        → "[newYear] Current Enrol"
@@ -19,97 +19,54 @@
 //        · Returns blank when Enrolment_Number has no date columns (table shorter than col D)
 //      - Adds a new empty "[newYear+2] Enrol Est" column
 //      - Deletes the now-stale "[prevYear+2] Enrol Est" which is now +3 years out
-//   5. Updates the date-indicator row (row 3, above the table header at row 4) for formula columns:
-//      · Enrolment_Number columns: -3 Period Enrol, -2 Period Enrol, -1 Period Enrol, [newYear] Current Enrol, [newYear] Enrol
-//      · Prediction_Tool columns:  -3 Period Prediction Tool, -2 Period Prediction Tool, -1 Period Prediction Tool, Current Prediction Tool
-//      · Shows the last date column header from the source table, or "no data" when table has no date columns
-//   6. Clears all date columns (after Study Period) in Enrolment_Number and Prediction_Tool tables
+//   5. Clears all date columns (after Study Period) in Enrolment_Number and Prediction_Tool tables
+//      Note: date-indicator row 3 formulas are self-maintaining — no update needed each rollover
 
 function main(workbook: ExcelScript.Workbook) {
-  // ── 1. Prompt for new year ────────────────────────────────────────────────
-  // Office Scripts don't have a native prompt dialog; use an input cell approach.
-  // The button should first show instructions via a named range or fixed cell,
-  // then read the year from a dedicated input cell (Instructions!B_ROLLOVER or similar).
-  // For now we read from a named range "RolloverYear" if it exists, else fall back
-  // to a hard-coded cell on the Instructions sheet.
-
-  const instructionsSheet = workbook.getWorksheet("Instructions");
-  if (!instructionsSheet) {
-    console.log("Error: 'Instructions' sheet not found.");
+  // ── 1. Read current year from YEAR PLANNING ──────────────────────────────
+  // B1 contains the current planning year but may be a merged cell; getValue() returns
+  // empty for non-top-left cells of a merge, so scan A1:F3 as a fallback.
+  const yearPlanningSheet = workbook.getWorksheet("YEAR PLANNING");
+  if (!yearPlanningSheet) {
+    console.log("Error: 'YEAR PLANNING' sheet not found.");
     return;
   }
 
-  // Read the year the admin typed into the designated input cell.
-  // Merged-cell note: getValue() returns null/empty for non-top-left cells of a merged range.
-  // If B1 is empty or invalid, scan A1:F2 to find the value within the merged area.
-  const YEAR_INPUT_CELL = "B1";
-  let newYearRaw = instructionsSheet.getRange(YEAR_INPUT_CELL).getValue();
-
-  if (!newYearRaw || isNaN(Number(newYearRaw))) {
-    const scanVals = instructionsSheet.getRange("A1:F2").getValues();
+  let currentYearRaw = yearPlanningSheet.getRange("B1").getValue();
+  if (!currentYearRaw || isNaN(Number(currentYearRaw))) {
+    const scanVals = yearPlanningSheet.getRange("A1:F3").getValues();
     let found = false;
     for (const row of scanVals) {
+      if (found) break;
       for (const v of row) {
         const n = Number(v);
         if (v !== null && v !== "" && !isNaN(n) && n > 2020 && n < 2100) {
-          newYearRaw = v;
-          console.log(`Year found by scanning Instructions A1:F2 (merged cell): ${newYearRaw}`);
+          currentYearRaw = v;
+          console.log(`Current year ${currentYearRaw} found in YEAR PLANNING via merged-cell scan.`);
           found = true;
           break;
         }
       }
-      if (found) break;
     }
+  } else {
+    console.log(`Current year ${currentYearRaw} read from YEAR PLANNING!B1.`);
   }
 
-  if (!newYearRaw || isNaN(Number(newYearRaw))) {
-    // Fall back: read current year from YEAR PLANNING and add 1.
-    // Also scan a range in case that cell is also merged.
-    const yearPlanningFallback = workbook.getWorksheet("YEAR PLANNING");
-    if (yearPlanningFallback) {
-      let currentYearVal = yearPlanningFallback.getRange("B1").getValue();
-      if (!currentYearVal || isNaN(Number(currentYearVal))) {
-        const fpScan = yearPlanningFallback.getRange("A1:F2").getValues();
-        let found = false;
-        for (const row of fpScan) {
-          for (const v of row) {
-            const n = Number(v);
-            if (v !== null && v !== "" && !isNaN(n) && n > 2020 && n < 2100) {
-              currentYearVal = v;
-              found = true;
-              break;
-            }
-          }
-          if (found) break;
-        }
-      }
-      if (currentYearVal && !isNaN(Number(currentYearVal))) {
-        newYearRaw = Number(currentYearVal) + 1;
-        console.log(`Instructions B1 empty — auto-detected new year as ${newYearRaw} (YEAR PLANNING year + 1)`);
-      }
-    }
-  }
-
-  if (!newYearRaw || isNaN(Number(newYearRaw))) {
-    console.log(`Error: Could not determine the new year. Please type the new year (e.g. 2027) into Instructions!${YEAR_INPUT_CELL} and run again.`);
+  if (!currentYearRaw || isNaN(Number(currentYearRaw))) {
+    console.log("Error: Could not read current year from YEAR PLANNING. Ensure B1 (or the merged region around it) contains the current year (e.g. 2026).");
     return;
   }
 
-  const newYear = Number(newYearRaw);
-  const prevYear = newYear - 1;
+  const newYear = Number(currentYearRaw) + 1;
+  const prevYear = newYear - 1;            // = currentYearRaw
   const oldestYearToDelete = newYear - 3;  // e.g. for 2027: delete 2024
-  const futureYear = newYear + 2;           // e.g. for 2027: add 2029
+  const futureYear = newYear + 2;          // e.g. for 2027: add 2029
 
-  console.log(`Rollover: prevYear=${prevYear}, newYear=${newYear}, delete=${oldestYearToDelete}, future=${futureYear}`);
+  console.log(`Rollover: currentYear=${currentYearRaw}, newYear=${newYear}, delete=${oldestYearToDelete}, future=${futureYear}`);
 
   // ── 2. Update YEAR PLANNING sheet ────────────────────────────────────────
-  const yearPlanningSheet = workbook.getWorksheet("YEAR PLANNING");
-  if (yearPlanningSheet) {
-    yearPlanningSheet.getRange("B1").setValue(newYear);
-    console.log(`✓ Updated YEAR PLANNING!B1 to ${newYear}`);
-  } else {
-    console.log("Warning: 'YEAR PLANNING' sheet not found — skipping B1 update.");
-  }
+  yearPlanningSheet.getRange("B1").setValue(newYear);
+  console.log(`✓ Updated YEAR PLANNING!B1 to ${newYear}`);
 
   // ── 3. Rename year-labelled columns in Enrolment_Tracker ─────────────────
   const trackerTable = findTable(workbook, "Enrolment_Tracker");
@@ -123,6 +80,7 @@ function main(workbook: ExcelScript.Workbook) {
     { from: `${prevYear} Lec / Sem Hrs`,  to: `${newYear} Lec / Sem Hrs` },
     { from: `${prevYear} Tutorial Hrs`,   to: `${newYear} Tutorial Hrs`  },
     { from: `${prevYear} Dev Hrs`,        to: `${newYear} Dev Hrs`        },
+    { from: `${prevYear}\nDev Hrs`,       to: `${newYear} Dev Hrs`        }, // handle cell-wrapped header
   ];
 
   renameTableColumns(trackerTable, yearColumns);
@@ -197,15 +155,30 @@ function main(workbook: ExcelScript.Workbook) {
     console.log(`Warning: Column "${newYear} Enrol" not found — skipping formula seeding.`);
   }
 
-  // 4e. Add new future year column (e.g. "2029 Enrol Est") — empty
+  // 4e. Add new future year column (e.g. "2029 Enrol Est"), then paint format from newYear+1 Est.
+  //     Add first, name it, then get both columns fresh by name for the copy — avoids stale
+  //     range references that occur when using pre-insert indices after addColumn.
   trackerTable.addColumn(-1);
-  const addedHeaders = trackerTable.getHeaderRowRange().getValues()[0] as string[];
-  const lastIdx = addedHeaders.length - 1;
-  const headerRange = trackerTable.getHeaderRowRange();
-  const headerVals = headerRange.getValues();
-  headerVals[0][lastIdx] = `${futureYear} Enrol Est`;
-  headerRange.setValues(headerVals);
-  console.log(`✓ Added empty "${futureYear} Enrol Est" column`);
+  const hdrVals: (string | number | boolean)[][] = trackerTable.getHeaderRowRange().getValues();
+  hdrVals[0][hdrVals[0].length - 1] = `${futureYear} Enrol Est`;
+  trackerTable.getHeaderRowRange().setValues(hdrVals);
+  console.log(`✓ Added "${futureYear} Enrol Est" column`);
+
+  try {
+    const srcEstCol = trackerTable.getColumnByName(`${newYear + 1} Enrol Est`);
+    const dstEstCol = trackerTable.getColumnByName(`${futureYear} Enrol Est`);
+    if (srcEstCol && dstEstCol) {
+      const srcRange = srcEstCol.getRange();
+      const dstRange = dstEstCol.getRange();
+      dstRange.copyFrom(srcRange, ExcelScript.RangeCopyType.formats);
+      dstRange.getFormat().setColumnWidth(srcRange.getFormat().getColumnWidth());
+      console.log(`✓ Format painted from "${newYear + 1} Enrol Est" to "${futureYear} Enrol Est"`);
+    } else {
+      console.log(`Warning: Could not find Est column(s) for format copy.`);
+    }
+  } catch (e) {
+    console.log(`Warning: Could not copy format to "${futureYear} Enrol Est": ${e}`);
+  }
 
   // 4f. Delete the now-stale future-3 Enrol Est column (was newYear+2 before rollover = prevYear+2)
   //     e.g. for 2027 rollover: delete "2028 Enrol Est" (it was 2 years out under 2026, now it's only 1 year out — keep it)
@@ -214,34 +187,66 @@ function main(workbook: ExcelScript.Workbook) {
   //     e.g. for rollover to 2027: delete "2026 Enrol Est" (now redundant, replaced by actual 2026 Enrol data)
   deleteTableColumn(trackerTable, `${prevYear} Enrol Est`);
 
-  // ── 5. Update date-indicator row (row 3, above table header at row 4) ─────
-  const enrolNumberCols = [
-    "-3 Period Enrol",
-    "-2 Period Enrol",
-    "-1 Period Enrol",
-    `${newYear} Current Enrol`,
-    `${newYear} Enrol`,
-  ];
-  for (const colName of enrolNumberCols) {
-    updateDateIndicatorRow(trackerTable, colName, "Enrolment_Number");
-  }
-  const predToolCols = [
-    "-3 Period Prediction Tool",
-    "-2 Period Prediction Tool",
-    "-1 Period Prediction Tool",
-    "Current Prediction Tool",
-  ];
-  for (const colName of predToolCols) {
-    updateDateIndicatorRow(trackerTable, colName, "Prediction_Tool");
+  // 4g. Delete any stale "Enrol Est" columns that are not newYear+1 or newYear+2.
+  const keepEstCols = new Set([`${newYear + 1} Enrol Est`, `${futureYear} Enrol Est`]);
+  const headersNow = trackerTable.getHeaderRowRange().getValues()[0] as string[];
+  for (let i = headersNow.length - 1; i >= 0; i--) {
+    const h = String(headersNow[i]);
+    if (h.toLowerCase().includes("enrol est") && !keepEstCols.has(h)) {
+      deleteTableColumn(trackerTable, h);
+    }
   }
 
-  // ── 6. Clear date columns in Enrolment_Number and Prediction_Tool ─────────
-  clearDateColumns(workbook, "Enrolment_Number", ENROL_NUMBER_SHEET);
-  clearDateColumns(workbook, "Prediction_Tool", PRED_TOOL_SHEET);
+  // 4h. Unhide columns from newYear-2 through newYear+2 in case any were hidden.
+  const colsToUnhide = [
+    `${newYear - 2} Enrol`,
+    `${newYear - 1} Enrol`,
+    `${newYear} Enrol`,
+    `${newYear + 1} Enrol Est`,
+    `${futureYear} Enrol Est`,
+  ];
+  for (const colName of colsToUnhide) {
+    try {
+      const col = trackerTable.getColumnByName(colName);
+      if (col) {
+        col.getRange().getFormat().setColumnHidden(false);
+        console.log(`✓ Unhid "${colName}"`);
+      }
+    } catch {
+      // not found or already visible — skip
+    }
+  }
+
+  // 4i. Set row text colour to red for: Subject Coordinator, any "Notes" column,
+  //     and TE / A+ Configuration (case-insensitive match; skip if not found).
+  const redColHeaders = trackerTable.getHeaderRowRange().getValues()[0] as string[];
+  for (let i = 0; i < redColHeaders.length; i++) {
+    const h = String(redColHeaders[i]).toLowerCase().trim();
+    const isTarget =
+      h === "subject coordinator" ||
+      h.includes("notes") ||
+      h === "te / a+ configuration";
+    if (isTarget) {
+      try {
+        trackerTable.getColumnByIndex(i)
+          .getRangeBetweenHeaderAndTotal()
+          .getFormat().getFont().setColor("#FF0000");
+        console.log(`✓ Set red font on "${redColHeaders[i]}"`);
+      } catch {
+        // column exists in header but range inaccessible — skip
+      }
+    }
+  }
+
+  // ── 5. Clear date columns in Enrolment_Number and Prediction_Tool ─────────
+  // Note: the date-indicator row (row 3) cells contain self-maintaining formulas that
+  // auto-resolve to the last date column header (or "no data" when cleared) — no update needed.
+  clearDateColumnsOnSheet(workbook, ENROL_NUMBER_SHEET);
+  clearDateColumnsOnSheet(workbook, PRED_TOOL_SHEET);
 
   console.log("✓ Rollover complete!");
   console.log(`  Year updated to: ${newYear}`);
-  console.log(`  Reminder: Clear the Instructions!${YEAR_INPUT_CELL} cell after rollover.`);
+  console.log(`  Next rollover will read YEAR PLANNING!B1 = ${newYear} and roll to ${newYear + 1}.`);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -295,85 +300,61 @@ function deleteTableColumn(table: ExcelScript.Table, columnName: string) {
   }
 }
 
-function clearDateColumns(workbook: ExcelScript.Workbook, tableName: string, sheetFallback?: string) {
-  let table = findTable(workbook, tableName);
-  if (!table && sheetFallback) {
-    const sheet = workbook.getWorksheet(sheetFallback);
-    if (sheet) {
-      const tables = sheet.getTables();
-      if (tables.length > 0) {
-        table = tables[0];
-        console.log(`Info: Table "${tableName}" not found by name; using first table on "${sheetFallback}".`);
+/**
+ * Clears all date columns (after Study Period) using raw sheet range deletion.
+ * Works regardless of whether the data is in a formal Excel table.
+ * Scans the first 6 rows to find the "Study Period" header, then deletes
+ * all columns to its right, right-to-left to keep indices stable.
+ */
+function clearDateColumnsOnSheet(workbook: ExcelScript.Workbook, sheetName: string) {
+  const sheet = workbook.getWorksheet(sheetName);
+  if (!sheet) {
+    console.log(`Warning: Sheet "${sheetName}" not found — skipping date column clear.`);
+    return;
+  }
+
+  const usedRange = sheet.getUsedRange();
+  if (!usedRange) {
+    console.log(`Warning: Sheet "${sheetName}" is empty — skipping.`);
+    return;
+  }
+
+  const usedColCount = usedRange.getColumnCount();
+  const usedRowCount = usedRange.getRowCount();
+  const usedStartCol = usedRange.getColumnIndex();
+
+  const scanRows = Math.min(6, usedRowCount);
+  let studyPeriodSheetCol = -1;
+
+  outerLoop:
+  for (let r = 0; r < scanRows; r++) {
+    for (let c = 0; c < usedColCount; c++) {
+      const val = String(usedRange.getCell(r, c).getValue()).trim();
+      if (val === STUDY_PERIOD_COL) {
+        studyPeriodSheetCol = usedStartCol + c;
+        break outerLoop;
       }
     }
   }
-  if (!table) {
-    console.log(`Warning: Table "${tableName}" not found — skipping clear.`);
+
+  if (studyPeriodSheetCol === -1) {
+    console.log(`Warning: "${STUDY_PERIOD_COL}" not found on "${sheetName}" — skipping.`);
     return;
   }
 
-  const headers = table.getHeaderRowRange().getValues()[0] as string[];
-  const studyPeriodIdx = headers.indexOf(STUDY_PERIOD_COL);
+  const lastSheetCol = usedStartCol + usedColCount - 1;
+  const colsToDelete = lastSheetCol - studyPeriodSheetCol;
 
-  if (studyPeriodIdx === -1) {
-    console.log(`Warning: "${STUDY_PERIOD_COL}" column not found in ${tableName} — skipping clear.`);
+  if (colsToDelete <= 0) {
+    console.log(`No date columns to delete on "${sheetName}".`);
     return;
   }
 
-  // Delete all columns after Study Period (right to left to avoid index shift)
-  const totalCols = headers.length;
-  for (let i = totalCols - 1; i > studyPeriodIdx; i--) {
-    try {
-      table.getColumnByIndex(i).delete();
-    } catch {
-      // ignore
-    }
-  }
-  console.log(`✓ Cleared all date columns from "${tableName}" (kept up to Study Period)`);
-}
-
-/**
- * Writes a formula to the date-indicator row immediately above the table header
- * (row 3 when the table header is at row 4).  The formula shows:
- *   • The last date-column header from sourceTableName  (when date columns exist), or
- *   • "no data"                                         (when the table has no date columns
- *                                                        beyond Study Period)
- *
- * This prevents VALUE errors and misleading text that appear after the source table
- * has been cleared and INDEX falls back to a non-numeric column.
- *
- * Skips silently if the column is not found or there is no row above the header.
- */
-function updateDateIndicatorRow(
-  table: ExcelScript.Table,
-  columnName: string,
-  sourceTableName: string
-) {
-  try {
-    const col = table.getColumnByName(columnName);
-    if (!col) {
-      console.log(`Warning: Column "${columnName}" not found — skipping date indicator update.`);
-      return;
-    }
-
-    // Step one row up from the header cell into the date-indicator row.
-    const colIndex = col.getIndex();
-    const headerCell = table.getHeaderRowRange().getCell(0, colIndex);
-    const dateIndicatorCell = headerCell.getOffsetRange(-1, 0);
-
-    const dateFormula =
-      `=IFERROR(` +
-        `IF(` +
-          `COLUMNS(${sourceTableName}[#Data])<=MATCH("${STUDY_PERIOD_COL}",${sourceTableName}[#Headers],0),` +
-          `"no data",` +
-          `INDEX(${sourceTableName}[#Headers],1,COLUMNS(${sourceTableName}[#Data]))` +
-        `),` +
-        `"no data"` +
-      `)`;
-
-    dateIndicatorCell.setFormula(dateFormula);
-    console.log(`✓ Updated date indicator for "${columnName}" (shows last date or "no data")`);
-  } catch {
-    console.log(`Info: No date indicator row above "${columnName}" header — skipping.`);
-  }
+  // Delete the entire block of date columns in one operation.
+  const currentUsed = sheet.getUsedRange();
+  const rows = currentUsed ? currentUsed.getRowCount() : 1;
+  const firstDateCol = studyPeriodSheetCol + 1;
+  sheet.getRangeByIndexes(0, firstDateCol, rows, colsToDelete)
+       .delete(ExcelScript.DeleteShiftDirection.left);
+  console.log(`✓ Cleared ${colsToDelete} date column(s) from "${sheetName}" (kept up to "${STUDY_PERIOD_COL}") in one operation`);
 }
