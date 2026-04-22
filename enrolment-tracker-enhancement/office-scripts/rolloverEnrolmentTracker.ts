@@ -12,6 +12,7 @@
 //      - "[prevYear] Dev Hrs"              → "[newYear] Dev Hrs"
 //   4. Shifts historical enrol columns (keeps only ±2 years from newYear):
 //      - Deletes the oldest year column (newYear - 3)
+//      - Renames "[newYear] Enrol Est"     → "[newYear] Enrol"    (promoted from estimates column)
 //      - Renames "[prevYear] Enrol"        → "[newYear-1] Enrol"  (already correct, from copy)
 //      - Hard-copies "[prevYear] Enrol" values (strips formulas) so data survives the date-column clear
 //      - Sets "[newYear] Enrol" column to the LET formula (pulls from Enrolment_Number)
@@ -39,19 +40,52 @@ function main(workbook: ExcelScript.Workbook) {
   }
 
   // Read the year the admin typed into the designated input cell.
-  // If empty, default to the current year (from YEAR PLANNING!B1) + 1.
-  const YEAR_INPUT_CELL = "B1"; // ← admin can pre-fill this, or leave blank for auto-detect
-  const yearCell = instructionsSheet.getRange(YEAR_INPUT_CELL);
-  let newYearRaw = yearCell.getValue();
+  // Merged-cell note: getValue() returns null/empty for non-top-left cells of a merged range.
+  // If B1 is empty or invalid, scan A1:F2 to find the value within the merged area.
+  const YEAR_INPUT_CELL = "B1";
+  let newYearRaw = instructionsSheet.getRange(YEAR_INPUT_CELL).getValue();
 
   if (!newYearRaw || isNaN(Number(newYearRaw))) {
-    // Fall back: read current year from YEAR PLANNING!B1 and add 1
+    const scanVals = instructionsSheet.getRange("A1:F2").getValues();
+    let found = false;
+    for (const row of scanVals) {
+      for (const v of row) {
+        const n = Number(v);
+        if (v !== null && v !== "" && !isNaN(n) && n > 2020 && n < 2100) {
+          newYearRaw = v;
+          console.log(`Year found by scanning Instructions A1:F2 (merged cell): ${newYearRaw}`);
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+  }
+
+  if (!newYearRaw || isNaN(Number(newYearRaw))) {
+    // Fall back: read current year from YEAR PLANNING and add 1.
+    // Also scan a range in case that cell is also merged.
     const yearPlanningFallback = workbook.getWorksheet("YEAR PLANNING");
     if (yearPlanningFallback) {
-      const currentYearVal = yearPlanningFallback.getRange("B1").getValue();
+      let currentYearVal = yearPlanningFallback.getRange("B1").getValue();
+      if (!currentYearVal || isNaN(Number(currentYearVal))) {
+        const fpScan = yearPlanningFallback.getRange("A1:F2").getValues();
+        let found = false;
+        for (const row of fpScan) {
+          for (const v of row) {
+            const n = Number(v);
+            if (v !== null && v !== "" && !isNaN(n) && n > 2020 && n < 2100) {
+              currentYearVal = v;
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+      }
       if (currentYearVal && !isNaN(Number(currentYearVal))) {
         newYearRaw = Number(currentYearVal) + 1;
-        console.log(`B1 was empty — auto-detected new year as ${newYearRaw} (YEAR PLANNING!B1 + 1)`);
+        console.log(`Instructions B1 empty — auto-detected new year as ${newYearRaw} (YEAR PLANNING year + 1)`);
       }
     }
   }
@@ -102,8 +136,10 @@ function main(workbook: ExcelScript.Workbook) {
   // 4a. Delete oldest year column (e.g. "2024 Enrol")
   deleteTableColumn(trackerTable, `${oldestYearToDelete} Enrol`);
 
-  // 4b. Rename "2026 Enrol Est" → already correct as historical (no rename needed;
-  //     the user archived 2025 data so 2026 enrol is now the "-1 period" historical)
+  // 4b. Rename "${newYear} Enrol Est" → "${newYear} Enrol"
+  //     The estimates column added during the previous rollover is now promoted to the active
+  //     formula column for this year.  Must happen before the hard-copy and formula steps below.
+  renameTableColumns(trackerTable, [{ from: `${newYear} Enrol Est`, to: `${newYear} Enrol` }]);
 
   // 4c. Rename current year Enrol column to carry forward if needed
   //     (If the column is still named "[prevYear] Enrol" from last year's rollover, rename it)
@@ -151,7 +187,7 @@ function main(workbook: ExcelScript.Workbook) {
                   `Enrolment_Number[Subject Code]&Enrolment_Number[Study Period], 0) + 1, ` +
             `numCols), ` +
           `"")), ` +
-      `IF(OR(result="", result=0, NOT(ISNUMBER(result))), "", result))`;
+      `IF(OR(result="", result=0), "", result))`;
 
     for (let r = 0; r < rowCount; r++) {
       dataRange.getCell(r, 0).setFormula(formula);
@@ -200,8 +236,8 @@ function main(workbook: ExcelScript.Workbook) {
   }
 
   // ── 6. Clear date columns in Enrolment_Number and Prediction_Tool ─────────
-  clearDateColumns(workbook, "Enrolment_Number");
-  clearDateColumns(workbook, "Prediction_Tool");
+  clearDateColumns(workbook, "Enrolment_Number", ENROL_NUMBER_SHEET);
+  clearDateColumns(workbook, "Prediction_Tool", PRED_TOOL_SHEET);
 
   console.log("✓ Rollover complete!");
   console.log(`  Year updated to: ${newYear}`);
@@ -211,6 +247,8 @@ function main(workbook: ExcelScript.Workbook) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STUDY_PERIOD_COL = "Study Period";
+const ENROL_NUMBER_SHEET = "Enrolment Number Tracker";
+const PRED_TOOL_SHEET = "Prediction Tool Tracker";
 
 function findTable(workbook: ExcelScript.Workbook, tableName: string): ExcelScript.Table | undefined {
   for (const ws of workbook.getWorksheets()) {
@@ -257,8 +295,18 @@ function deleteTableColumn(table: ExcelScript.Table, columnName: string) {
   }
 }
 
-function clearDateColumns(workbook: ExcelScript.Workbook, tableName: string) {
-  const table = findTable(workbook, tableName);
+function clearDateColumns(workbook: ExcelScript.Workbook, tableName: string, sheetFallback?: string) {
+  let table = findTable(workbook, tableName);
+  if (!table && sheetFallback) {
+    const sheet = workbook.getWorksheet(sheetFallback);
+    if (sheet) {
+      const tables = sheet.getTables();
+      if (tables.length > 0) {
+        table = tables[0];
+        console.log(`Info: Table "${tableName}" not found by name; using first table on "${sheetFallback}".`);
+      }
+    }
+  }
   if (!table) {
     console.log(`Warning: Table "${tableName}" not found — skipping clear.`);
     return;
