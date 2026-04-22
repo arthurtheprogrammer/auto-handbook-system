@@ -17,6 +17,7 @@ A guide for team members who manage the data sources and run the system. No codi
 - [Backing Up](#backing-up)
 - [Refreshing Lecturer Data](#refreshing-lecturer-data)
 - [First-Time Setup](#first-time-setup-excel-trust--calculation-settings)
+- [Handing Over Power Automate Flows](#handing-over-power-automate-flows)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
 
 ---
@@ -596,6 +597,69 @@ Or via preferences:
 3. Close the preferences window
 
 </details>
+
+---
+
+## Handing Over Power Automate Flows
+
+If ownership of the Power Automate flows needs to move to a new person (e.g. a staff change), follow these steps. The flow URLs and VBA modules **do not need to change** — only the internal connections and Office Script references need to be updated.
+
+> [!IMPORTANT]
+> The new person must have access to the same SharePoint sites as the previous owner (Enrolment Tracker, Teaching Matrix, and the main workbook folder) before starting.
+
+### Step 1 — Create Connections
+
+In [Power Automate](https://make.powerautomate.com), the new person creates their own connections:
+
+1. Go to **Data → Connections → New connection**
+2. Create connections for each of the following (authenticate with your university account):
+   - **Excel Online (Business)**
+   - **SharePoint**
+   - **Microsoft Teams** (if applicable)
+   - **Office 365 Outlook** (if applicable)
+
+### Step 2 — Copy Office Scripts to Your OneDrive
+
+Power Automate can only use Office Scripts that belong to the authenticated connection's account. The new person needs their own copies:
+
+1. Open each Office Script file shared during handover (`.osts` files)
+2. In **Excel Online** → **Automate** tab → **New Script**
+3. Paste the script code in and save it — use the same name as the original
+
+Repeat for each script (Subject List Parser, Teaching Stream Parser, and any others shared during handover).
+
+### Step 3 — Update the Solution Connection Reference
+
+The flows are part of a Power Automate solution, so connections are managed centrally:
+
+1. Open the solution in Power Automate
+2. Find the **Connection References** section
+3. Switch the **Excel Online (Business)** reference to your newly created connection
+4. Do the same for SharePoint and any other connections listed
+5. Save the solution — this applies to all flows at once
+
+> [!NOTE]
+> If you see a "ReadAccess" error when trying to update the connection reference, ask the previous owner to add you as a **co-owner** of the solution first (solution → **Share** → add your name).
+
+### Step 4 — Remap "Run Script" Actions
+
+For any flow that runs an Office Script, the script reference must be updated to point to your copy:
+
+1. Open the flow in edit mode
+2. **Before changing anything** — screenshot the "Run Script" action so you have a record of the script name and all parameter values
+3. Switch the connection to your connection
+4. The **Script** dropdown will go blank — this is expected. Click it and select your copy of the script
+5. Re-enter the parameters exactly as they were in the screenshot
+6. Save the flow
+
+> [!TIP]
+> Repeat Step 4 for every flow that has a "Run Script" action — there may be more than one.
+
+### Step 5 — Test
+
+1. Manually trigger each flow from Power Automate to confirm it runs successfully
+2. The **first 1–3 runs** after a connection switch may be slower than usual (up to 5 minutes) — this is normal as the new connection warms up
+3. After a few runs, performance should return to normal
 
 ---
 
